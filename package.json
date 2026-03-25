@@ -1,0 +1,10 @@
+{
+  "name": "uniwork-kz",
+  "version": "1.0.0",
+  "description": "UniWork.kz student freelance platform prototype with Lean Canvas and working backend",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  }
+}
