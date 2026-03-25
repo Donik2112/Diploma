@@ -1,0 +1,208 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  STUDENT
+  CLIENT
+  ADMIN
+}
+
+enum ProjectStatus {
+  OPEN
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum ApplicationStatus {
+  SENT
+  ACCEPTED
+  REJECTED
+  WITHDRAWN
+}
+
+enum AvailabilityStatus {
+  AVAILABLE
+  PART_TIME
+  NOT_AVAILABLE
+}
+
+model User {
+  id            String         @id @default(cuid())
+  role          Role
+  fullName      String
+  email         String         @unique
+  passwordHash  String
+  university    String?
+  bio           String?
+  avatarUrl     String?
+  city          String?
+  rating        Float          @default(0)
+  isSuspended   Boolean        @default(false)
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  studentProfile StudentProfile?
+  clientProfile  ClientProfile?
+  projects      Project[]      @relation("ClientProjects")
+  applications  Application[]  @relation("StudentApplications")
+  sentMessages  Message[]      @relation("SentMessages")
+  recvMessages  Message[]      @relation("ReceivedMessages")
+  givenReviews  Review[]       @relation("GivenReviews")
+  receivedReviews Review[]     @relation("ReceivedReviews")
+  favorites     FavoriteProject[]
+  recommendations RecommendationLog[]
+}
+
+model StudentProfile {
+  id                String    @id @default(cuid())
+  userId             String    @unique
+  skills             String[]
+  experienceLevel    String
+  portfolioLinks     String[]
+  certificates       String[]
+  interests          String[]
+  githubUrl          String?
+  linkedinUrl        String?
+  resumeText         String?
+  about              String?
+  availabilityStatus AvailabilityStatus @default(AVAILABLE)
+  user               User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model ClientProfile {
+  id                 String @id @default(cuid())
+  userId             String @unique
+  companyName        String
+  companyDescription String
+  website            String?
+  industry           String
+  user               User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Project {
+  id              String      @id @default(cuid())
+  clientId        String
+  title           String
+  description     String
+  category        String
+  requiredSkills  String[]
+  budgetMin       Int
+  budgetMax       Int
+  deadline        DateTime
+  city            String
+  employmentType  String
+  experienceLevel String
+  status          ProjectStatus @default(OPEN)
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+  client          User        @relation("ClientProjects", fields: [clientId], references: [id], onDelete: Cascade)
+  applications    Application[]
+  reviews         Review[]
+  messages        Message[]
+  payments        Payment[]
+  favorites       FavoriteProject[]
+  recommendations RecommendationLog[]
+}
+
+model Application {
+  id               String            @id @default(cuid())
+  projectId         String
+  studentId         String
+  coverLetter       String
+  proposedPrice     Int
+  estimatedDuration String
+  status            ApplicationStatus @default(SENT)
+  createdAt         DateTime         @default(now())
+  project           Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  student           User              @relation("StudentApplications", fields: [studentId], references: [id], onDelete: Cascade)
+  @@unique([projectId, studentId])
+}
+
+model Review {
+  id         String   @id @default(cuid())
+  projectId  String
+  fromUserId String
+  toUserId   String
+  rating     Int
+  text       String
+  createdAt  DateTime @default(now())
+  project    Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  fromUser   User     @relation("GivenReviews", fields: [fromUserId], references: [id], onDelete: Cascade)
+  toUser     User     @relation("ReceivedReviews", fields: [toUserId], references: [id], onDelete: Cascade)
+}
+
+model Message {
+  id         String   @id @default(cuid())
+  projectId  String
+  senderId   String
+  receiverId String
+  text       String
+  createdAt  DateTime @default(now())
+  project    Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  sender     User     @relation("SentMessages", fields: [senderId], references: [id], onDelete: Cascade)
+  receiver   User     @relation("ReceivedMessages", fields: [receiverId], references: [id], onDelete: Cascade)
+}
+
+model Payment {
+  id        String   @id @default(cuid())
+  projectId String
+  amount    Int
+  method    String
+  status    String
+  paidAt    DateTime?
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+}
+
+model RecommendationLog {
+  id          String   @id @default(cuid())
+  studentId   String
+  projectId   String
+  score       Float
+  sourceModel String
+  createdAt   DateTime @default(now())
+  student     User     @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  title     String
+  content   String
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+}
+
+model FavoriteProject {
+  id        String   @id @default(cuid())
+  userId    String
+  projectId String
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  @@unique([userId, projectId])
+}
+
+model AssistantLog {
+  id        String   @id @default(cuid())
+  userId    String?
+  prompt    String
+  response  String
+  createdAt DateTime @default(now())
+}
+
+model ModerationLog {
+  id        String   @id @default(cuid())
+  adminId   String
+  action    String
+  targetType String
+  targetId   String
+  note      String?
+  createdAt DateTime @default(now())
+}
