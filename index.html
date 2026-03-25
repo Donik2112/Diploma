@@ -1,0 +1,628 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>UniWork.kz — Student Freelance Platform (Prototype)</title>
+  <meta name="description" content="UniWork.kz — a student‑focused freelance marketplace: jobs feed, profile, chat, protected payments, and gamification." />
+  <style>
+    :root{
+      /* Light, calm palette */
+      --bg:#f7fafc;               /* page background */
+      --surface:#ffffff;           /* cards/nav */
+      --surface-2:#f3f6fb;         /* subtle */
+      --line:#e5eaf2;              /* borders */
+      --text:#0f172a;              /* main text */
+      --muted:#64748b;             /* secondary */
+      --brand:#2563eb;             /* primary blue */
+      --brand-2:#60a5fa;           /* light blue */
+      --ok:#16a34a;                /* green */
+      --warn:#d97706;              /* orange */
+      --bad:#ef4444;               /* red */
+      --kaspi:#e31e24;             /* kaspi accent */
+      --shadow: 0 20px 50px rgba(15,23,42,.06), 0 6px 18px rgba(2,6,23,.05);
+      --radius: 16px;
+      --radius-sm: 12px;
+      --radius-lg: 22px;
+      --gap: 18px;
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{margin:0; font-family: Inter, ui-sans-serif, -apple-system, Segoe UI, Roboto, Arial, "Noto Sans", "Helvetica Neue", sans-serif; color:var(--text); background:var(--bg)}
+    a{color:inherit;text-decoration:none}
+    .container{max-width:1220px;margin:0 auto;padding:0 22px}
+
+    /* NAV */
+    .nav{position:sticky;top:0;z-index:60;background:rgba(255,255,255,.92); backdrop-filter:saturate(140%) blur(10px); border-bottom:1px solid var(--line)}
+    .nav .inner{display:flex;align-items:center;gap:20px; padding:14px 0}
+    .brand{display:flex;align-items:center;gap:12px;font-weight:800;letter-spacing:.2px}
+    .logo{width:36px;height:36px;border-radius:10px;display:grid;place-items:center;background:linear-gradient(135deg,var(--brand),var(--brand-2));box-shadow:var(--shadow)}
+    .logo svg{filter: drop-shadow(0 2px 4px rgba(30,58,138,.25))}
+    .navlinks{display:flex;gap:6px;margin-left:auto}
+    .tab{padding:10px 14px;border-radius:12px;border:1px solid var(--line); background:#fff;cursor:pointer}
+    .tab.active{background:linear-gradient(180deg, rgba(37,99,235,.10), rgba(37,99,235,.05)); border-color: rgba(37,99,235,.35)}
+    .cta{margin-left:8px; background:linear-gradient(135deg,var(--brand),var(--brand-2)); color:#ffffff; font-weight:700; border:none}
+
+    /* SECTION WRAPPERS */
+    .section{padding:42px 0}
+    .card{background:var(--surface); border:1px solid var(--line); border-radius:var(--radius); box-shadow:var(--shadow)}
+    .card.pad{padding:24px}
+    .title{display:flex;align-items:baseline;gap:10px;margin:0 0 12px}
+    .title h2{margin:0;font-size:28px}
+    .subtitle{color:var(--muted)}
+
+    /* HERO (Landing) */
+    .hero{display:grid;grid-template-columns:1.1fr .9fr;gap:var(--gap)}
+    h1{font-size:46px;line-height:1.08;margin:0 0 10px}
+    .lead{color:var(--muted);font-size:18px;margin:0 0 18px}
+    .pills{display:flex;flex-wrap:wrap;gap:8px;margin:14px 0 22px}
+    .pill{padding:8px 12px;border-radius:999px;border:1px solid var(--line); background:var(--surface-2); color:#0f172a}
+    .kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:18px}
+    .kpi{padding:16px;border-radius:14px;background:#fff; border:1px dashed var(--line)}
+    .kpi b{font-size:22px}
+
+    /* LANDING LAYOUT */
+    .landing-grid{display:grid;grid-template-columns:1fr 1fr;gap:var(--gap)}
+
+    /* Orders PAGE layout: sidebar + content */
+    .orders-layout{display:grid;grid-template-columns:280px 1fr;gap:var(--gap)}
+    .sidebar{position:sticky; top:84px; align-self:start; display:grid; gap:10px}
+    .toolbar .label{font-size:12px;color:var(--muted);margin-bottom:6px}
+    .toolbar .input, .toolbar select{background:#fff; color:var(--text); border:1px solid var(--line); border-radius:12px; height:40px; padding:0 12px; outline:none; width:100%}
+    .toolbar .btn{height:40px;padding:0 14px;border-radius:12px;border:1px solid var(--line);background:#fff;color:var(--text);cursor:pointer;width:100%}
+    .btn.brand{background:linear-gradient(135deg,var(--brand),var(--brand-2)); color:#fff; border:none;font-weight:700}
+
+    .list{display:grid;gap:12px}
+    .job{padding:18px;border-radius:14px;background:#fff; border:1px solid var(--line)}
+    .job h3{margin:0 0 8px;font-size:18px}
+    .meta{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+    .tag{font-size:12px;padding:6px 10px;border-radius:999px; background:var(--surface-2); border:1px solid var(--line)}
+    .row{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:12px}
+    .price{font-weight:800;color:#0f172a}
+    .deadline{color:var(--warn)}
+    .veri{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:#1d4ed8}
+    .empty{padding:32px;text-align:center;color:var(--muted)}
+
+    /* Job drawer (details) */
+    .drawer{position:fixed;right:0;top:0;height:100%;width:520px;background:#fff;border-left:1px solid var(--line);box-shadow: -10px 0 30px rgba(2,6,23,.08); transform: translateX(100%); transition:.25s; z-index:80; display:flex;flex-direction:column}
+    .drawer.open{transform: translateX(0)}
+    .drawer-header{padding:16px 18px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between}
+    .drawer-body{padding:18px;overflow:auto}
+
+    /* PROFILE PAGE (separate, focused) */
+    .profile-layout{display:grid; grid-template-columns:340px 1fr; gap:var(--gap)}
+    .avatar{width:100px;height:100px;border-radius:24px;background:linear-gradient(135deg,#dbeafe,#e0f2fe); border:1px solid var(--line); display:grid;place-items:center}
+    .skills{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0}
+    .progress{height:10px;background:#e8eef7;border-radius:999px;overflow:hidden;border:1px solid var(--line)}
+    .progress>span{display:block;height:100%;background:linear-gradient(90deg,var(--brand),var(--brand-2))}
+    .board{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+    .metric{padding:16px;border:1px solid var(--line);border-radius:12px;background:#fff}
+
+    .orders-table{width:100%;border-collapse:separate;border-spacing:0 10px}
+    .orders-table th{font-size:12px;color:var(--muted);text-align:left;padding:0 10px}
+    .orders-table td{background:#fff;border:1px solid var(--line);border-left:none;border-right:none;padding:12px 10px}
+    .orders-table tr{border-radius:12px}
+    .orders-table .actions{display:flex;gap:8px}
+
+    /* CHAT */
+    .chat{display:grid;grid-template-columns:280px 1fr;gap:var(--gap)}
+    .threads,.messages{border-radius:14px;border:1px solid var(--line); background:#fff}
+    .thread{display:flex;gap:10px;padding:12px 14px;border-bottom:1px solid var(--line);cursor:pointer}
+    .thread.active{background:var(--surface-2)}
+    .bubble{max-width:78%; padding:12px 14px; border-radius:12px; margin:8px 0; background:#f3f6fb; border:1px solid var(--line)}
+    .me{margin-left:auto;background:linear-gradient(180deg, rgba(37,99,235,.10), rgba(37,99,235,.05)); border-color:rgba(37,99,235,.25)}
+    .composer{display:flex;gap:8px;padding:10px;border-top:1px solid var(--line)}
+
+    /* FOOTER */
+    footer{opacity:.9;color:#475569;margin:40px 0 30px}
+
+    /* RESPONSIVE */
+    @media (max-width: 1140px){
+      .hero{grid-template-columns:1fr}
+      .landing-grid{grid-template-columns:1fr}
+    }
+    @media (max-width: 980px){
+      .orders-layout{grid-template-columns:1fr}
+      .sidebar{position:static}
+      .profile-layout{grid-template-columns:1fr}
+      .board{grid-template-columns:1fr 1fr}
+      .chat{grid-template-columns:1fr}
+    }
+    @media (max-width: 640px){
+      .board{grid-template-columns:1fr}
+    }
+  </style>
+</head>
+<body>
+  <!-- NAVIGATION -->
+  <div class="nav">
+    <div class="container inner">
+      <div class="brand" style="gap:10px">
+        <div class="logo" aria-label="UniWork.kz logo">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+            <path d="M4 12l8-8 8 8-8 8-8-8Z" fill="#0b1a55"/>
+            <path d="M8 12l4-4 4 4-4 4-4-4Z" fill="#ffffff"/>
+          </svg>
+        </div>
+        <span style="font-weight:800">UniWork.kz</span>
+        <span class="pill" title="Students only">Verified Students</span>
+      </div>
+      <div class="navlinks">
+        <button class="tab active" data-open="home">Home</button>
+        <button class="tab" data-open="orders">Orders</button>
+        <button class="tab" data-open="profile">Profile</button>
+        <button class="tab" data-open="chat">Chat</button>
+        <button class="tab" data-open="about">About</button>
+        <button class="tab cta" data-open="post">+ New Order</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- HOME / LANDING -->
+  <section id="home" class="section">
+    <div class="container hero">
+      <div class="card pad">
+        <h1>Find real projects. Get paid. Build your portfolio.</h1>
+        <p class="lead">Protected payments via Kaspi/Stripe, university email verification, and AI‑powered job recommendations tailored for students in Kazakhstan.</p>
+        <div class="pills">
+          <span class="pill">Kaspi escrow</span>
+          <span class="pill">University email check</span>
+          <span class="pill">Gamification</span>
+          <span class="pill">Built‑in chat</span>
+          <span class="pill">AI recommendations</span>
+        </div>
+        <div style="display:flex;gap:10px">
+          <button class="tab cta" data-open="orders">Browse orders</button>
+          <button class="tab" data-open="post">Post an order</button>
+        </div>
+        <div class="kpis">
+          <div class="kpi"><div>Projects today</div><b id="kpi-projects">48</b></div>
+          <div class="kpi"><div>Kaspi payouts</div><b style="color:var(--kaspi)">₸ 3.1M</b></div>
+          <div class="kpi"><div>Success rate</div><b style="color:var(--ok)">98.4%</b></div>
+        </div>
+      </div>
+      <div class="card pad">
+        <div class="title"><h2>Payment Protection</h2><span class="subtitle">Kaspi / Stripe</span></div>
+        <p>Funds are reserved in escrow and released to the student after delivery — protecting both client and performer.</p>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:10px">
+          <div class="metric"><b>Escrow</b><div class="subtitle">Safe holding</div></div>
+          <div class="metric"><b>Dispute help</b><div class="subtitle">Platform support</div></div>
+          <div class="metric"><b>Kaspi</b><div class="subtitle">Local payment</div></div>
+          <div class="metric"><b>Stripe</b><div class="subtitle">Cards & Apple Pay</div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="container section landing-grid" style="margin-top:22px">
+      <div class="card pad">
+        <div class="title"><h2>How it works</h2><span class="subtitle">3 simple steps</span></div>
+        <ol style="line-height:1.9;margin:0">
+          <li><b>Register with .edu</b> — verify your university email.</li>
+          <li><b>Post or apply</b> — clients create orders, students apply.</li>
+          <li><b>Deliver & get paid</b> — escrow ensures safe payouts.</li>
+        </ol>
+        <div class="pills" style="margin-top:12px">
+          <span class="pill">5–10% commission</span>
+          <span class="pill">Premium visibility</span>
+          <span class="pill">Referral program</span>
+        </div>
+      </div>
+      <div class="card pad">
+        <div class="title"><h2>Popular categories</h2><span class="subtitle">quick start</span></div>
+        <div class="list" id="featured"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ORDERS PAGE: clear two‑column layout -->
+  <section id="orders" class="section" hidden>
+    <div class="container orders-layout">
+      <aside class="sidebar">
+        <div class="card pad toolbar">
+          <div class="label">Search</div>
+          <input id="q" class="input" placeholder="Website, bot, design…"/>
+        </div>
+        <div class="card pad toolbar">
+          <div class="label">Skill</div>
+          <select id="skill">
+            <option value="">Any</option>
+            <option>Frontend</option>
+            <option>Backend</option>
+            <option>Python</option>
+            <option>Data Science</option>
+            <option>Mobile</option>
+            <option>Design</option>
+            <option>Chatbot</option>
+          </select>
+        </div>
+        <div class="card pad toolbar">
+          <div class="label">Budget</div>
+          <select id="budget">
+            <option value="">Any</option>
+            <option value="0-50000">up to ₸50k</option>
+            <option value="50000-150000">₸50k–150k</option>
+            <option value="150000-9999999">₸150k+</option>
+          </select>
+        </div>
+        <div class="card pad toolbar" style="display:grid;gap:8px">
+          <button class="btn" id="reset">Reset</button>
+          <button class="btn brand" id="applyFilters">Apply</button>
+        </div>
+      </aside>
+
+      <div>
+        <div class="title" style="margin-bottom:12px"><h2>Orders</h2><span class="subtitle" id="count">Loading…</span></div>
+        <div class="list" id="jobs"></div>
+        <div class="empty" id="emptyOrders" hidden>No orders match your filters.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- PROFILE PAGE: separated & action‑focused -->
+  <section id="profile" class="section" hidden>
+    <div class="container profile-layout">
+      <div class="card pad">
+        <div style="display:flex; gap:14px; align-items:center">
+          <div class="avatar">
+            <svg width="48" height="48" viewBox="0 0 24 24" fill="#2563eb" aria-hidden="true"><path d="M12 12c2.8 0 5-2.2 5-5s-2.2-5-5-5-5 2.2-5 5 2.2 5 5 5Zm0 2c-4 0-8 2-8 6v2h16v-2c0-4-4-6-8-6Z"/></svg>
+          </div>
+          <div>
+            <h2 style="margin:0">Aruzhan Seitova</h2>
+            <div class="subtitle">a.seitova@aitu.edu.kz • Verified student</div>
+            <div style="color:#f59e0b">★★★★★ 4.9</div>
+          </div>
+        </div>
+        <div style="margin:14px 0 6px" class="subtitle">Skills</div>
+        <div class="skills" id="studentSkills"></div>
+        <div style="margin-top:12px" class="subtitle">Level</div>
+        <div class="progress" aria-label="XP progress" title="Experience (XP)"><span id="xpBar" style="width:64%"></span></div>
+      </div>
+
+      <div class="card pad">
+        <div class="board">
+          <div class="metric"><div class="subtitle">Completed</div><h3 style="margin:8px 0 0">10</h3></div>
+          <div class="metric"><div class="subtitle">In progress</div><h3 style="margin:8px 0 0" id="inProg">1</h3></div>
+          <div class="metric"><div class="subtitle">XP</div><h3 style="margin:8px 0 0">1260</h3></div>
+        </div>
+        <div class="title" style="margin-top:18px"><h2>My Orders</h2><span class="subtitle">take & manage</span></div>
+        <table class="orders-table" id="myOrdersTbl">
+          <thead>
+            <tr>
+              <th>Order</th>
+              <th>Budget</th>
+              <th>Deadline</th>
+              <th>Status</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="myOrders"></tbody>
+        </table>
+
+        <div class="title" style="margin-top:18px"><h2>Portfolio</h2><span class="subtitle">latest work</span></div>
+        <div class="list" id="portfolio"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- CHAT -->
+  <section id="chat" class="section" hidden>
+    <div class="container">
+      <div class="title"><h2>Chat</h2><span class="subtitle">contracts & discussions</span></div>
+      <div class="chat">
+        <div class="threads" id="threads"></div>
+        <div class="messages" style="display:flex;flex-direction:column">
+          <div id="msgBox" style="flex:1; padding:14px; overflow:auto"></div>
+          <div class="composer">
+            <input id="msg" class="input" placeholder="Type a message…" style="flex:1; height:40px; border:1px solid var(--line); border-radius:12px; padding:0 12px"/>
+            <button class="btn brand" id="send">Send</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ABOUT -->
+  <section id="about" class="section" hidden>
+    <div class="container">
+      <div class="card pad">
+        <div class="title"><h2>UniWork.kz — Product & Marketing</h2><span class="subtitle">Assignment 3</span></div>
+        <details open>
+          <summary><b>Key capabilities</b></summary>
+          <ul>
+            <li>Profiles: photo, skills, portfolio, rating, university verification</li>
+            <li>Orders feed: tasks, budget, deadline, applications</li>
+            <li>Chat & reviews, payment protection (Kaspi/Stripe)</li>
+            <li>Gamification: XP, badges, levels</li>
+            <li>AI assistant for job matching</li>
+          </ul>
+        </details>
+        <details>
+          <summary><b>Pricing</b></summary>
+          <p>Freemium + 5–10% commission. Premium: search priority & analytics.</p>
+        </details>
+        <details>
+          <summary><b>Distribution</b></summary>
+          <ul>
+            <li>Web now, mobile later</li>
+            <li>SEO, TikTok/Instagram, university partnerships</li>
+            <li>Referral & ambassador programs</li>
+          </ul>
+        </details>
+        <details>
+          <summary><b>Promotion</b></summary>
+          <ul>
+            <li>Student success reels, IT influencer collabs</li>
+            <li>Hackathons & campus events</li>
+          </ul>
+        </details>
+      </div>
+    </div>
+  </section>
+
+  <!-- POST ORDER -->
+  <section id="post" class="section" hidden>
+    <div class="container">
+      <div class="card pad" style="max-width:760px;margin:0 auto">
+        <div class="title"><h2>Post an Order</h2><span class="subtitle">quick form</span></div>
+        <div style="display:grid; gap:10px;">
+          <input id="pTitle" class="input" placeholder="Title: Need a React landing page" style="height:44px;border:1px solid var(--line);border-radius:12px;padding:0 12px"/>
+          <textarea id="pDesc" class="input" placeholder="Describe your task…" style="min-height:120px; padding:12px;border:1px solid var(--line);border-radius:12px"></textarea>
+          <div style="display:flex; gap:10px; flex-wrap:wrap">
+            <input id="pBudget" class="input" placeholder="Budget, ₸" style="width:160px;height:44px;border:1px solid var(--line);border-radius:12px;padding:0 12px"/>
+            <input id="pDeadline" class="input" placeholder="Deadline: 2025‑11‑15" style="width:180px;height:44px;border:1px solid var(--line);border-radius:12px;padding:0 12px"/>
+            <input id="pTags" class="input" placeholder="Tags: Frontend, Design" style="flex:1;height:44px;border:1px solid var(--line);border-radius:12px;padding:0 12px"/>
+          </div>
+          <button class="btn brand" id="createJob" style="height:44px">Publish & proceed to escrow</button>
+          <div id="postStatus" class="subtitle"></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <footer class="container">© 2025 UniWork.kz • Demo only. All data is fictional. • Terms & Privacy</footer>
+
+  <!-- JOB DETAILS DRAWER -->
+  <div class="drawer" id="drawer">
+    <div class="drawer-header">
+      <div style="display:flex;flex-direction:column">
+        <b id="dwTitle">Order</b>
+        <span class="subtitle" id="dwSub">Details</span>
+      </div>
+      <button class="tab" onclick="closeDrawer()">Close</button>
+    </div>
+    <div class="drawer-body">
+      <div id="dwBody"></div>
+      <div style="display:flex;gap:10px;margin-top:16px">
+        <button class="btn brand" onclick="applyDrawer()">Apply</button>
+        <button class="btn" onclick="closeDrawer()">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // -------- Mock data --------
+    const student = {
+      name: 'Aruzhan Seitova',
+      email: 'a.seitova@aitu.edu.kz',
+      xp: 1260,
+      skills: ['Frontend','React','Node.js','Design','Chatbot','Python'],
+      portfolio:[
+        {title:'Coffee shop landing', price: '₸120,000', tags:['Frontend','Design']},
+        {title:'Telegram booking bot', price:'₸90,000', tags:['Chatbot','Node.js']},
+        {title:'Analytics dashboard', price:'₸180,000', tags:['Python','Data Science']},
+      ]
+    };
+
+    const jobsData = [
+      {id:1, title:'Clinic brochure website', desc:'Responsive React + simple CMS.', price:90000, deadline:'2025-11-10', tags:['Frontend','React','Design'], verified:true},
+      {id:2, title:'Price scraper in Python', desc:'Collect prices from 4 sites, CSV export', price:70000, deadline:'2025-10-30', tags:['Python'], verified:false},
+      {id:3, title:'Logo & mini brand‑book', desc:'Clean mark + simple style guide', price:50000, deadline:'2025-10-26', tags:['Design'], verified:true},
+      {id:4, title:'Telegram bot backend', desc:'Node.js, Kaspi payments, small admin', price:150000, deadline:'2025-11-20', tags:['Chatbot','Node.js'], verified:true},
+      {id:5, title:'React Native todo app', desc:'List + push notifications', price:180000, deadline:'2025-12-01', tags:['Mobile','Frontend'], verified:false},
+      {id:6, title:'Image classification (ML)', desc:'Simple CNN or transfer learning', price:220000, deadline:'2025-11-30', tags:['Python','Data Science'], verified:true},
+      {id:7, title:'FinTech landing (Next.js)', desc:'Animations, domain setup', price:160000, deadline:'2025-11-05', tags:['Frontend','React','Design'], verified:true},
+      {id:8, title:'Web speed optimization', desc:'Lighthouse 95+, code‑split, cache', price:80000, deadline:'2025-10-28', tags:['Frontend'], verified:false},
+      {id:9, title:'Presentation design (20 slides)', desc:'Minimalist style', price:60000, deadline:'2025-10-27', tags:['Design'], verified:true}
+    ];
+
+    const threads = [
+      { id:'t1', name:'SmileDent Clinic', last:'What’s the deadline?', messages:[
+          {me:false, text:'Hi! How many pages do you need?'},
+          {me:true, text:'About 5: home, services, doctors, booking, contacts.'},
+          {me:false, text:'What’s the deadline?'}
+      ]},
+      { id:'t2', name:'BrewBae Coffee', last:'Waiting for menu edits', messages:[
+          {me:true, text:'Shared the first draft.'},
+          {me:false, text:'Looks great! Waiting for menu edits.'}
+      ]}
+    ];
+
+    // Profile orders (actions demo)
+    let myOrders = [
+      {id:101, title:'Landing for startup', budget:120000, deadline:'2025-11-12', status:'Invited'},
+      {id:102, title:'Telegram shop bot', budget:150000, deadline:'2025-11-28', status:'In review'}
+    ];
+
+    // -------- Helpers --------
+    const $ = s => document.querySelector(s);
+    const $$ = s => document.querySelectorAll(s);
+
+    function setActive(sectionId){
+      $$('.tab').forEach(b=>b.classList.toggle('active', b.dataset.open===sectionId));
+      ['home','orders','profile','chat','about','post'].forEach(id=>{
+        const el = $('#'+id);
+        if (!el) return;
+        el.hidden = id!==sectionId;
+      });
+      if(sectionId==='orders') renderJobs();
+      if(sectionId==='profile') renderProfile();
+      if(sectionId==='chat') renderChat();
+      if(sectionId==='home') { renderFeatured(); }
+    }
+
+    $$('.tab, [data-open]').forEach(b=> b.addEventListener('click', ()=> setActive(b.dataset.open)) );
+
+    // -------- Landing featured --------
+    const featuredCats = [
+      {title:'Frontend projects', icon:'💻', desc:'React/Next.js, responsive UI', tag:'Frontend'},
+      {title:'Python & Data', icon:'🐍', desc:'Scrapers, bots, analytics', tag:'Python'},
+      {title:'Design', icon:'🎨', desc:'Logos, decks, UI kits', tag:'Design'},
+      {title:'Chat‑bots', icon:'🤖', desc:'Telegram/WhatsApp, integrations', tag:'Chatbot'},
+      {title:'Mobile', icon:'📱', desc:'React Native / Flutter', tag:'Mobile'},
+      {title:'Backend', icon:'🗄️', desc:'Node.js APIs, databases', tag:'Backend'}
+    ];
+    function renderFeatured(){
+      $('#featured').innerHTML = featuredCats.map(c=>`
+        <div class="job">
+          <h3>${c.icon} ${c.title}</h3>
+          <div class="subtitle">${c.desc}</div>
+          <div class="row">
+            <button class="btn brand" onclick="quickFilter('${c.tag}')">Browse orders</button>
+            <span class="veri"><svg width="14" height="14" viewBox="0 0 24 24" fill="#2563eb"><path d="M9 16.2 4.8 12l1.4-1.4L9 13.4l8.8-8.8L19.2 6 9 16.2Z"/></svg> high demand</span>
+          </div>
+        </div>`).join('');
+    }
+    window.quickFilter = (tag)=>{ setActive('orders'); $('#skill').value = tag; renderJobs(); };
+
+    // -------- Orders page --------
+    function jobCard(j){
+      const tags = j.tags.map(t=>`<span class="tag">${t}</span>`).join('');
+      return `<div class="job">
+        <h3>${j.title}</h3>
+        <div class="subtitle">${j.desc}</div>
+        <div class="meta" aria-label="Tags">${tags}</div>
+        <div class="row">
+          <div class="price">₸ ${j.price.toLocaleString('ru-KZ')}</div>
+          <div class="deadline" title="Deadline">by ${j.deadline}</div>
+        </div>
+        <div class="row">
+          <div style="display:flex;align-items:center;gap:10px">
+            ${j.verified?`<span class="veri"><svg width="16" height="16" viewBox="0 0 24 24" fill="#2563eb"><path d="M9 16.2 4.8 12l1.4-1.4L9 13.4l8.8-8.8L19.2 6 9 16.2Z"/></svg> Verified client</span>`:''}
+          </div>
+          <div style="display:flex;gap:8px">
+            <button class="btn" onclick="openDrawer(${j.id})">View details</button>
+            <button class="btn brand" onclick="apply(${j.id})">Apply</button>
+          </div>
+        </div>
+      </div>`
+    }
+
+    function parseBudget(v){ if(!v) return [0, Infinity]; const [a,b]=v.split('-').map(Number); return [a,b] }
+
+    function renderJobs(){
+      const q = $('#q').value.trim().toLowerCase();
+      const skill = $('#skill').value;
+      const [minB, maxB] = parseBudget($('#budget').value);
+      const filtered = jobsData.filter(j=>{
+        const okQ = !q || (j.title+j.desc+j.tags.join(',')).toLowerCase().includes(q);
+        const okS = !skill || j.tags.includes(skill);
+        const okB = j.price>=minB && j.price<=maxB;
+        return okQ && okS && okB;
+      });
+      const list = $('#jobs');
+      list.innerHTML = filtered.map(jobCard).join('');
+      $('#count').textContent = `Found: ${filtered.length}`;
+      $('#emptyOrders').hidden = filtered.length>0;
+    }
+
+    // Drawer interactions
+    let currentDrawer = null;
+    function openDrawer(id){
+      const j = jobsData.find(x=>x.id===id); currentDrawer=j;
+      $('#dwTitle').textContent = j.title;
+      $('#dwSub').textContent = `₸ ${j.price.toLocaleString('ru-KZ')} • deadline ${j.deadline}`;
+      const body = `
+        <p>${j.desc}</p>
+        <div class="meta">${j.tags.map(t=>`<span class='tag'>${t}</span>`).join('')}</div>
+        <ul>
+          <li>Scope: 1 landing page, basic CMS, contact form</li>
+          <li>Deliverables: responsive pages, deployment</li>
+          <li>Payment: Kaspi escrow</li>
+        </ul>`;
+      $('#dwBody').innerHTML = body;
+      $('#drawer').classList.add('open');
+    }
+    function closeDrawer(){ $('#drawer').classList.remove('open'); }
+    function applyDrawer(){ if(currentDrawer) { apply(currentDrawer.id); closeDrawer(); } }
+
+    // -------- Profile page --------
+    function tag(t){ return `<span class="tag">${t}</span>` }
+
+    function renderProfile(){
+      $('#studentSkills').innerHTML = student.skills.map(tag).join('');
+      const levelPct = Math.min(100, Math.round((student.xp % 2000)/20));
+      $('#xpBar').style.width = levelPct+'%';
+
+      // portfolio
+      $('#portfolio').innerHTML = student.portfolio.map(p=>`
+        <div class="job">
+          <h3>${p.title}</h3>
+          <div class="meta">${p.tags.map(tag).join('')}</div>
+          <div class="row"><span class="price">${p.price}</span><button class="btn">Preview</button></div>
+        </div>`).join('');
+
+      // my orders table
+      const tbody = $('#myOrders');
+      tbody.innerHTML = myOrders.map(o=>`
+        <tr>
+          <td>${o.title}</td>
+          <td>₸ ${o.budget.toLocaleString('ru-KZ')}</td>
+          <td>${o.deadline}</td>
+          <td><span class="tag">${o.status}</span></td>
+          <td class="actions">
+            ${o.status==='Invited'?`<button class="btn brand" onclick="takeOrder(${o.id})">Accept</button>`:''}
+            ${o.status==='In progress'?`<button class="btn" onclick="markDone(${o.id})">Submit</button>`:''}
+            ${o.status!=='Completed'?`<button class="btn" onclick="declineOrder(${o.id})">Decline</button>`:''}
+          </td>
+        </tr>`).join('');
+      $('#inProg').textContent = myOrders.filter(o=>o.status==='In progress').length;
+    }
+
+    window.takeOrder = (id)=>{
+      const o = myOrders.find(x=>x.id===id); if(!o) return; o.status='In progress'; renderProfile(); alert('Order accepted. Good luck!');
+    }
+    window.markDone = (id)=>{
+      const o = myOrders.find(x=>x.id===id); if(!o) return; o.status='Completed'; renderProfile(); alert('Submitted for review. Escrow will release on approval.');
+    }
+    window.declineOrder = (id)=>{
+      myOrders = myOrders.filter(x=>x.id!==id); renderProfile();
+    }
+
+    // -------- Chat --------
+    let currentThread = 0;
+    function renderChat(){
+      const list = threads.map((t,i)=> `
+        <div class="thread ${i===currentThread?'active':''}" onclick="openThread(${i})">
+          <div style="width:34px;height:34px;border-radius:10px;background:#eef2ff"></div>
+          <div>
+            <div style="font-weight:700">${t.name}</div>
+            <div class="subtitle" style="font-size:12px">${t.last}</div>
+          </div>
+        </div>`).join('');
+      $('#threads').innerHTML = list;
+      renderMessages();
+    }
+    function openThread(i){ currentThread=i; renderChat(); }
+    function renderMessages(){
+      const box = $('#msgBox');
+      const msgs = threads[currentThread].messages.map(m=> `<div class="bubble ${m.me?'me':''}">${m.text}</div>`).join('');
+      box.innerHTML = msgs; box.scrollTop = box.scrollHeight;
+    }
+    $('#send').addEventListener('click', ()=>{
+      const text = $('#msg').value.trim(); if(!text) return;
+      threads[currentThread].messages.push({me:true, text});
+      $('#msg').value=''; renderMessages();
+    });
+
+    // -------- Apply / escrow simulation --------
+    window.apply = (id)=>{
+      const j = jobsData.find(x=>x.id===id);
+      alert('Application sent for “'+j.title+'”. Funds will be reserved via Kaspi/Stripe when your proposal is accepted.');
+      setActive('chat');
+    }
+
+    // init
+    setActive('home');
+  </script>
+</body>
+</html>
