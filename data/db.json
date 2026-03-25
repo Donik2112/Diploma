@@ -1,0 +1,70 @@
+{
+  "projects": [
+    {
+      "id": 1,
+      "title": "Сайт для кофейни",
+      "description": "Нужен лендинг + форма брони. Стек: React + Node.js",
+      "budget": 120000,
+      "category": "Веб-сайты",
+      "customer": "BrewBae",
+      "deadline": "2026-04-20",
+      "createdAt": "2026-03-20T12:00:00.000Z"
+    },
+    {
+      "id": 2,
+      "title": "Telegram-бот для доставки",
+      "description": "Бот с меню, заказами и уведомлениями.",
+      "budget": 90000,
+      "category": "Telegram-боты",
+      "customer": "FastBox",
+      "deadline": "2026-04-10",
+      "createdAt": "2026-03-22T15:30:00.000Z"
+    },
+    {
+      "id": 3,
+      "title": "ML классификатор отзывов",
+      "description": "Нужно NLP решение",
+      "budget": 150000,
+      "category": "ML",
+      "customer": "FoodTech",
+      "deadline": "2026-05-01",
+      "createdAt": "2026-03-25T19:39:17.009Z"
+    }
+  ],
+  "applications": [
+    {
+      "id": 1,
+      "projectId": 1,
+      "studentName": "Аружан",
+      "skills": "React, UI/UX",
+      "coverLetter": "Сделаю адаптивно, с высокой скоростью загрузки.",
+      "status": "new",
+      "createdAt": "2026-03-23T10:00:00.000Z"
+    },
+    {
+      "id": 2,
+      "projectId": 3,
+      "studentName": "Dana",
+      "skills": "Python, NLP",
+      "coverLetter": "Сделаю быстро",
+      "status": "new",
+      "createdAt": "2026-03-25T19:39:22.855Z"
+    }
+  ],
+  "messages": [
+    {
+      "id": 1,
+      "projectId": 1,
+      "author": "BrewBae",
+      "text": "Нужна интеграция WhatsApp-кнопки.",
+      "createdAt": "2026-03-23T11:00:00.000Z"
+    },
+    {
+      "id": 2,
+      "projectId": 3,
+      "author": "Dana",
+      "text": "Готова обсудить детали",
+      "createdAt": "2026-03-25T19:39:22.886Z"
+    }
+  ]
+}
