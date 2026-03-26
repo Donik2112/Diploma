@@ -1,15 +1,30 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-import { verifyToken } from '@/lib/auth';
+
+type TokenPayload = { role?: 'STUDENT' | 'CLIENT' | 'ADMIN'; exp?: number };
+
+function decodeJwtPayload(token?: string): TokenPayload | null {
+  if (!token) return null;
+  try {
+    const parts = token.split('.');
+    if (parts.length < 2) return null;
+    const payloadBase64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+    const json = atob(payloadBase64);
+    return JSON.parse(json);
+  } catch {
+    return null;
+  }
+}
 
 export function middleware(req: NextRequest) {
   const path = req.nextUrl.pathname;
   const token = req.cookies.get('token')?.value;
-  const user = token ? verifyToken(token) : null;
+  const payload = decodeJwtPayload(token);
+  const role = payload?.role;
 
-  if (path.startsWith('/admin') && user?.role !== 'ADMIN') return NextResponse.redirect(new URL('/signin', req.url));
-  if (path.startsWith('/client') && !['CLIENT', 'ADMIN'].includes(user?.role || '')) return NextResponse.redirect(new URL('/signin', req.url));
-  if (path.startsWith('/student') && !['STUDENT', 'ADMIN'].includes(user?.role || '')) return NextResponse.redirect(new URL('/signin', req.url));
+  if (path.startsWith('/admin') && role !== 'ADMIN') return NextResponse.redirect(new URL('/signin', req.url));
+  if (path.startsWith('/client') && !['CLIENT', 'ADMIN'].includes(role || '')) return NextResponse.redirect(new URL('/signin', req.url));
+  if (path.startsWith('/student') && !['STUDENT', 'ADMIN'].includes(role || '')) return NextResponse.redirect(new URL('/signin', req.url));
   return NextResponse.next();
 }
 
