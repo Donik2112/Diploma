@@ -1,0 +1,7 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {@apply bg-slate-50 text-slate-900;}
+.card {@apply bg-white border border-slate-200 rounded-xl shadow-sm;}
+.container-app {@apply max-w-7xl mx-auto px-4 md:px-6;}
