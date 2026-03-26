@@ -1,18 +1,27 @@
-import { NextResponse } from 'next/server';
+import { z } from 'zod';
 import bcrypt from 'bcryptjs';
-import { connectDB } from '@/lib/db';
 import User from '@/models/User';
-import { signToken } from '@/lib/auth';
+import { connectDB } from '@/lib/db';
+import { handleApi, ok, ApiError } from '@/lib/api';
+import { signAccessToken, signRefreshToken } from '@/lib/auth';
+
+const schema = z.object({ email: z.string().email(), password: z.string().min(6).max(128) });
 
 export async function POST(req: Request) {
-  const { email, password } = await req.json();
-  await connectDB();
-  const user: any = await User.findOne({ email });
-  if (!user) return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 });
-  const ok = await bcrypt.compare(password, user.passwordHash);
-  if (!ok) return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 });
-  const token = signToken({ userId: user._id.toString(), role: user.role });
-  const response = NextResponse.json({ role: user.role });
-  response.cookies.set('token', token, { httpOnly: true, path: '/' });
-  return response;
+  return handleApi(async () => {
+    const { email, password } = schema.parse(await req.json());
+    await connectDB();
+    const user: any = await User.findOne({ email });
+    if (!user) throw new ApiError('Invalid credentials', 401);
+    const isValid = await bcrypt.compare(password, user.passwordHash);
+    if (!isValid) throw new ApiError('Invalid credentials', 401);
+
+    const token = signAccessToken({ userId: user._id.toString(), role: user.role });
+    const refreshToken = signRefreshToken({ userId: user._id.toString(), role: user.role });
+
+    const response = ok({ role: user.role, fullName: user.fullName });
+    response.cookies.set('token', token, { httpOnly: true, path: '/', sameSite: 'lax', secure: process.env.NODE_ENV === 'production' });
+    response.cookies.set('refresh_token', refreshToken, { httpOnly: true, path: '/', sameSite: 'lax', secure: process.env.NODE_ENV === 'production' });
+    return response;
+  });
 }

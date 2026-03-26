@@ -5,19 +5,20 @@ UniWork Diploma is a full-stack multi-role platform for matching students with f
 
 ## Features
 - Public pages: Home, About, Projects catalog, Project details
-- Auth: Sign up / Sign in with role selection
-- Student area: dashboard, profile editor, recommendations, applications, messaging
-- Client area: dashboard, create project, manage projects, applicants
+- Auth: Sign up / Sign in with role selection, refresh token flow, logout, profile endpoint
+- Student area: dashboard, profile editor (real CRUD), recommendations, applications (withdraw), messaging
+- Client area: dashboard, create project, manage projects (update status/delete), applicants (accept/reject)
 - Admin area: dashboard, users, projects moderation, analytics
 - Recommendation API with external ML service + fallback engine
 - AI Assistant widget with `/api/assistant`
 - Role-based route protection via middleware
+- Centralized API response/error format
 
 ## Tech Stack
 - Next.js 14 App Router + TypeScript
 - Tailwind CSS
 - MongoDB + Mongoose
-- JWT authentication
+- JWT access/refresh authentication
 - Zod validation
 - Recharts analytics
 - Lucide-react icons
@@ -25,7 +26,7 @@ UniWork Diploma is a full-stack multi-role platform for matching students with f
 ## Architecture Overview
 - `app/` UI routes and API routes
 - `components/` reusable UI and dashboard widgets
-- `lib/` db connection, auth, recommendation, assistant services
+- `lib/` db connection, auth, recommendation, assistant services, API response helpers
 - `models/` domain entities (User, Project, Application, etc.)
 - `prisma/seed.ts` seed script for demo data
 - `types/` shared TS types
@@ -56,14 +57,31 @@ npm run dev
 The app uses MongoDB Atlas. Default sample URI is prefilled in `.env.example` for local demo.
 
 ## API Endpoints
+### Authentication
 - `POST /api/auth/signup`
 - `POST /api/auth/signin`
+- `POST /api/auth/refresh`
+- `POST /api/auth/logout`
+- `GET /api/auth/me`
+
+### Projects
 - `GET /api/projects`
 - `GET /api/projects/:id`
 - `POST /api/projects`
 - `PUT /api/projects/:id`
+- `DELETE /api/projects/:id`
+- `GET /api/projects/:id/applications`
+
+### Applications
 - `GET /api/applications`
 - `POST /api/applications`
+- `PATCH /api/applications/:id` (`WITHDRAW`, `ACCEPT`, `REJECT`)
+
+### Student
+- `GET /api/student/profile`
+- `PUT /api/student/profile`
+
+### AI/ML and Admin
 - `POST /api/recommend`
 - `POST /api/assistant`
 - `GET /api/admin/stats`
@@ -82,8 +100,7 @@ All demo users use password: `password123`
 - Client: `client1@uniwork.demo`
 
 ## Future Improvements
-- Replace JWT cookie auth with NextAuth session management
-- Add full CRUD for profile/project/applications from dashboards
 - Add websocket real-time chat
 - Add moderation logs, notifications, favorites, and payment gateway integration
-- Add production-grade tests and CI/CD pipeline
+- Add unit/integration/E2E tests and CI/CD pipeline
+- Add advanced recommendation features with feature store and experiment tracking
