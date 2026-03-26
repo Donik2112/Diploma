@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { connectDB } from '@/lib/db';
+import { dbConnect } from '@/lib/mongodb';
 import { getRecommendations } from '@/lib/recommendation';
 import RecommendationLog from '@/models/RecommendationLog';
 import { handleApi, ok } from '@/lib/api';
@@ -16,7 +16,7 @@ const schema = z.object({
 
 export async function POST(req: Request) {
   return handleApi(async () => {
-    await connectDB();
+    await dbConnect();
     const input = schema.parse(await req.json());
     const result = await getRecommendations(input);
     const user = getUserFromCookie();

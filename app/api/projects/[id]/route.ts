@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import Project from '@/models/Project';
-import { connectDB } from '@/lib/db';
+import { dbConnect } from '@/lib/mongodb';
 import { handleApi, ok, ApiError } from '@/lib/api';
 import { requireAuth } from '@/lib/auth';
 
@@ -20,7 +20,7 @@ const updateSchema = z.object({
 
 export async function GET(_: Request, { params }: { params: { id: string } }) {
   return handleApi(async () => {
-    await connectDB();
+    await dbConnect();
     const project = await Project.findById(params.id).lean();
     if (!project) throw new ApiError('Project not found', 404);
     return ok(project);
@@ -30,7 +30,7 @@ export async function GET(_: Request, { params }: { params: { id: string } }) {
 export async function PUT(req: Request, { params }: { params: { id: string } }) {
   return handleApi(async () => {
     requireAuth(['CLIENT', 'ADMIN']);
-    await connectDB();
+    await dbConnect();
     const payload = updateSchema.parse(await req.json());
     const updated = await Project.findByIdAndUpdate(params.id, payload, { new: true });
     if (!updated) throw new ApiError('Project not found', 404);
@@ -41,7 +41,7 @@ export async function PUT(req: Request, { params }: { params: { id: string } }) 
 export async function DELETE(_: Request, { params }: { params: { id: string } }) {
   return handleApi(async () => {
     requireAuth(['CLIENT', 'ADMIN']);
-    await connectDB();
+    await dbConnect();
     const deleted = await Project.findByIdAndDelete(params.id);
     if (!deleted) throw new ApiError('Project not found', 404);
     return ok({ removed: true });

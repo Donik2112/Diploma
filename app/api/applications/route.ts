@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import Application from '@/models/Application';
-import { connectDB } from '@/lib/db';
+import { dbConnect } from '@/lib/mongodb';
 import { handleApi, ok } from '@/lib/api';
 import { requireAuth } from '@/lib/auth';
 
@@ -14,7 +14,7 @@ const createSchema = z.object({
 export async function GET() {
   return handleApi(async () => {
     const user = requireAuth();
-    await connectDB();
+    await dbConnect();
     const filter = user.role === 'STUDENT' ? { studentId: user.userId } : {};
     const rows = await Application.find(filter).sort({ createdAt: -1 }).lean();
     return ok(rows);
@@ -24,7 +24,7 @@ export async function GET() {
 export async function POST(req: Request) {
   return handleApi(async () => {
     const user = requireAuth(['STUDENT']);
-    await connectDB();
+    await dbConnect();
     const payload = createSchema.parse(await req.json());
     const app = await Application.create({ ...payload, studentId: user.userId, status: 'SENT' });
     return ok(app, 201);

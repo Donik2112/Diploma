@@ -1,7 +1,7 @@
 import bcrypt from 'bcryptjs';
 import { z } from 'zod';
 import { NextResponse } from 'next/server';
-import { connectDB } from '@/lib/db';
+import { dbConnect } from '@/lib/mongodb';
 import User from '@/models/User';
 import StudentProfile from '@/models/StudentProfile';
 import ClientProfile from '@/models/ClientProfile';
@@ -15,7 +15,7 @@ const schema = z.object({
 
 export async function POST(req: Request) {
   try {
-    await connectDB();
+    await dbConnect();
     const body = schema.parse(await req.json());
 
     if (await User.findOne({ email: body.email })) {
@@ -23,7 +23,12 @@ export async function POST(req: Request) {
     }
 
     const passwordHash = await bcrypt.hash(body.password, 10);
-    const user = await User.create({ ...body, passwordHash });
+    const user = await User.create({
+      fullName: body.fullName,
+      email: body.email,
+      role: body.role,
+      passwordHash
+    });
 
     if (body.role === 'STUDENT') {
       await StudentProfile.create({

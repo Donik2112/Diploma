@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import bcrypt from 'bcryptjs';
 import User from '@/models/User';
-import { connectDB } from '@/lib/db';
+import { dbConnect } from '@/lib/mongodb';
 import { handleApi, ok, ApiError } from '@/lib/api';
 import { signAccessToken, signRefreshToken } from '@/lib/auth';
 
@@ -10,7 +10,7 @@ const schema = z.object({ email: z.string().email(), password: z.string().min(6)
 export async function POST(req: Request) {
   return handleApi(async () => {
     const { email, password } = schema.parse(await req.json());
-    await connectDB();
+    await dbConnect();
     const user: any = await User.findOne({ email });
     if (!user) throw new ApiError('Invalid credentials', 401);
     const isValid = await bcrypt.compare(password, user.passwordHash);

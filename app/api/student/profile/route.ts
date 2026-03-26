@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import StudentProfile from '@/models/StudentProfile';
 import User from '@/models/User';
-import { connectDB } from '@/lib/db';
+import { dbConnect } from '@/lib/mongodb';
 import { handleApi, ok, ApiError } from '@/lib/api';
 import { requireAuth } from '@/lib/auth';
 
@@ -23,7 +23,7 @@ const schema = z.object({
 export async function GET() {
   return handleApi(async () => {
     const user = requireAuth(['STUDENT', 'ADMIN']);
-    await connectDB();
+    await dbConnect();
     const profile = await StudentProfile.findOne({ userId: user.userId }).lean();
     if (!profile) throw new ApiError('Profile not found', 404);
     return ok(profile);
@@ -33,7 +33,7 @@ export async function GET() {
 export async function PUT(req: Request) {
   return handleApi(async () => {
     const user = requireAuth(['STUDENT', 'ADMIN']);
-    await connectDB();
+    await dbConnect();
     const payload = schema.parse(await req.json());
     await User.findByIdAndUpdate(user.userId, {
       university: payload.university,

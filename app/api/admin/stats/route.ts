@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { connectDB } from '@/lib/db';
+import { dbConnect } from '@/lib/mongodb';
 import User from '@/models/User';
 import Project from '@/models/Project';
 import Application from '@/models/Application';
@@ -12,7 +12,7 @@ export async function GET() {
     return NextResponse.json({ error: 'MONGODB_URI is not configured' }, { status: 500 });
   }
 
-  await connectDB();
+  await dbConnect();
   const [totalUsers, totalStudents, totalClients, totalProjects, totalApplications] = await Promise.all([
     User.countDocuments({}),
     User.countDocuments({ role: 'STUDENT' }),
