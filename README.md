@@ -54,7 +54,7 @@ npm run dev
 - `npm run seed`
 
 ## Database Setup
-The app uses MongoDB Atlas. Default sample URI is prefilled in `.env.example` for local demo.
+The app uses MongoDB. If you run with Docker, do not use `localhost` from inside the app container; use the Mongo service name (for example `mongodb://mongo:27017/diploma-platform`).
 
 ## API Endpoints
 ### Authentication
@@ -85,6 +85,13 @@ The app uses MongoDB Atlas. Default sample URI is prefilled in `.env.example` fo
 - `POST /api/recommend`
 - `POST /api/assistant`
 - `GET /api/admin/stats`
+- `GET /api/test-db`
+
+### DB Health Check
+Use this endpoint to verify database connectivity:
+- `GET /api/test-db`
+
+It returns connection state, db name, and host.
 
 ## Recommendation API Integration
 `/api/recommend` behavior:
