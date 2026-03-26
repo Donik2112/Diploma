@@ -8,6 +8,8 @@ import StudentProfile from '@/models/StudentProfile';
 import ClientProfile from '@/models/ClientProfile';
 import { KAZAKHSTAN_UNIVERSITIES } from '@/lib/kazakhstanUniversities';
 
+export const dynamic = 'force-dynamic';
+
 const schema = z.object({
   firstName: z.string({ required_error: 'Enter your first name' }).trim()
     .min(1, 'Enter your first name')

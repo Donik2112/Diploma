@@ -5,6 +5,8 @@ import { dbConnect } from '@/lib/mongodb';
 import { handleApi, ok, ApiError } from '@/lib/api';
 import { requireAuth } from '@/lib/auth';
 
+export const dynamic = 'force-dynamic';
+
 const schema = z.object({
   university: z.string().max(120).optional(),
   city: z.string().max(80).optional(),

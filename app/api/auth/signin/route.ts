@@ -5,6 +5,8 @@ import { dbConnect } from '@/lib/mongodb';
 import { handleApi, ok, ApiError } from '@/lib/api';
 import { signAccessToken, signRefreshToken } from '@/lib/auth';
 
+export const dynamic = 'force-dynamic';
+
 const schema = z.object({ email: z.string().email(), password: z.string().min(6).max(128) });
 
 export async function POST(req: Request) {

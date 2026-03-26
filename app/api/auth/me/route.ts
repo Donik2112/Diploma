@@ -1,6 +1,8 @@
 import { handleApi, ok, ApiError } from '@/lib/api';
 import { getUserFromCookie } from '@/lib/auth';
 
+export const dynamic = 'force-dynamic';
+
 export async function GET() {
   return handleApi(async () => {
     const user = getUserFromCookie();
