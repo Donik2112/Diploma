@@ -10,7 +10,12 @@ import Message from '@/models/Message';
 import RecommendationLog from '@/models/RecommendationLog';
 
 async function main() {
-  await mongoose.connect(process.env.MONGODB_URI || '');
+  const mongodbUri = process.env.MONGODB_URI;
+  if (!mongodbUri) {
+    throw new Error('MONGODB_URI is not defined');
+  }
+
+  await mongoose.connect(mongodbUri);
   await Promise.all([User.deleteMany({}), StudentProfile.deleteMany({}), ClientProfile.deleteMany({}), Project.deleteMany({}), Application.deleteMany({}), Review.deleteMany({}), Message.deleteMany({}), RecommendationLog.deleteMany({})]);
 
   const pass = await bcrypt.hash('password123', 10);
