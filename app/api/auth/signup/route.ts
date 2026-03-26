@@ -7,6 +7,7 @@ import User from '@/models/User';
 import StudentProfile from '@/models/StudentProfile';
 import ClientProfile from '@/models/ClientProfile';
 import { KAZAKHSTAN_UNIVERSITIES } from '@/lib/kazakhstanUniversities';
+import { sendVerificationEmail } from '@/lib/email';
 
 export const dynamic = 'force-dynamic';
 
@@ -135,7 +136,7 @@ export async function POST(req: Request) {
 
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:8080';
     const verifyUrl = `${appUrl}/verify-email?token=${rawToken}`;
-    console.log('EMAIL VERIFICATION PLACEHOLDER:', verifyUrl);
+    await sendVerificationEmail(body.email, verifyUrl);
 
     return NextResponse.json(
       {
@@ -143,7 +144,7 @@ export async function POST(req: Request) {
         data: {
           userId: user._id.toString(),
           requiresEmailVerification: true,
-          message: 'Please verify your email address before signing in'
+          message: 'Account created. Please check your email to verify your account.'
         }
       },
       { status: 201 }
