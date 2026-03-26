@@ -5,7 +5,7 @@ import { useSearchParams } from 'next/navigation';
 export default function ApplicantsPageClient() {
   const [rows, setRows] = useState<any[]>([]);
   const searchParams = useSearchParams();
-  const projectId = searchParams.get('projectId') || '';
+  const projectId = searchParams?.get('projectId') ?? '';
 
   async function load() {
     if (!projectId) return;
