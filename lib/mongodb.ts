@@ -18,7 +18,9 @@ export async function dbConnect() {
   if (cached.conn) return cached.conn;
 
   if (!cached.promise) {
-    cached.promise = mongoose.connect(MONGODB_URI).then((conn) => {
+    const uri = MONGODB_URI as string;
+
+    cached.promise = mongoose.connect(uri).then((conn) => {
       console.log('Connected to MongoDB:', conn.connection.host, conn.connection.name);
       return conn;
     });
