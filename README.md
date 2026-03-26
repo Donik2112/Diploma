@@ -119,5 +119,5 @@ If `/api/auth/signup` and `/api/projects` both return `500`, check Mongo runtime
 1. Verify `/api/test-db` response.
 2. Ensure `MONGODB_URI` is set in the runtime container environment (not only build-time).
 3. For Atlas, use:
-   `mongodb+srv://madi:<db_password>@cluster0.rnb3q.mongodb.net/diploma-platform?appName=Cluster0`
+   `mongodb+srv://madi:madi@cluster0.avoaf.mongodb.net/TodoApp`
 4. If using Docker + local Mongo, do not use `localhost`; use service name (for example `mongo`).

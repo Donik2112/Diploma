@@ -1,10 +1,7 @@
 import mongoose from 'mongoose';
 
-const MONGODB_URI = process.env.MONGODB_URI;
-
-if (!MONGODB_URI) {
-  throw new Error('MONGODB_URI is not defined');
-}
+const DEFAULT_MONGODB_URI = 'mongodb+srv://madi:madi@cluster0.avoaf.mongodb.net/TodoApp';
+const MONGODB_URI = process.env.MONGODB_URI || DEFAULT_MONGODB_URI;
 
 declare global {
   // eslint-disable-next-line no-var
@@ -18,7 +15,10 @@ export async function dbConnect() {
   if (cached.conn) return cached.conn;
 
   if (!cached.promise) {
-    cached.promise = mongoose.connect(MONGODB_URI);
+    cached.promise = mongoose.connect(MONGODB_URI).then((conn) => {
+      console.log('Connected to MongoDB:', conn.connection.host);
+      return conn;
+    });
   }
 
   cached.conn = await cached.promise;
