@@ -1,4 +1,5 @@
 import bcrypt from 'bcryptjs';
+import { createHash, randomBytes } from 'crypto';
 import { z } from 'zod';
 import { NextResponse } from 'next/server';
 import { dbConnect } from '@/lib/mongodb';
@@ -31,8 +32,43 @@ const schema = z.object({
   }),
   university: z.string({ required_error: 'Select your university' }).trim()
     .min(1, 'Select your university')
-    .refine((v) => (KAZAKHSTAN_UNIVERSITIES as readonly string[]).includes(v), 'Select your university')
+    .refine((v) => (KAZAKHSTAN_UNIVERSITIES as readonly string[]).includes(v), 'Select your university'),
+  captchaToken: z.string({ required_error: 'Please complete the CAPTCHA' })
+    .min(1, 'Please complete the CAPTCHA')
 });
+
+function hashToken(token: string) {
+  return createHash('sha256').update(token).digest('hex');
+}
+
+function createVerificationToken() {
+  const rawToken = randomBytes(32).toString('hex');
+  const tokenHash = hashToken(rawToken);
+  const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+  return { rawToken, tokenHash, expiresAt };
+}
+
+async function verifyCaptcha(token: string, ip?: string | null) {
+  const secret = process.env.TURNSTILE_SECRET_KEY;
+  if (!secret) {
+    return token === 'dev-captcha-pass';
+  }
+
+  const body = new URLSearchParams();
+  body.append('secret', secret);
+  body.append('response', token);
+  if (ip) body.append('remoteip', ip);
+
+  const response = await fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body
+  });
+
+  if (!response.ok) return false;
+  const payload = await response.json();
+  return !!payload?.success;
+}
 
 export async function POST(req: Request) {
   try {
@@ -47,6 +83,13 @@ export async function POST(req: Request) {
     }
     const body = parsed.data;
     const fullName = `${body.firstName} ${body.lastName}`.trim();
+    const isCaptchaValid = await verifyCaptcha(body.captchaToken, req.headers.get('x-forwarded-for'));
+    if (!isCaptchaValid) {
+      return NextResponse.json(
+        { success: false, error: 'Please complete the CAPTCHA', field: 'captchaToken' },
+        { status: 400 }
+      );
+    }
 
     if (await User.findOne({ email: body.email })) {
       return NextResponse.json(
@@ -56,13 +99,16 @@ export async function POST(req: Request) {
     }
 
     const passwordHash = await bcrypt.hash(body.password, 10);
+    const { rawToken, tokenHash, expiresAt } = createVerificationToken();
     const user = await User.create({
       fullName,
       email: body.email,
       role: body.role,
       passwordHash,
       university: body.university,
-      emailVerified: false
+      emailVerified: false,
+      emailVerificationToken: tokenHash,
+      emailVerificationExpiresAt: expiresAt
     });
 
     if (body.role === 'STUDENT') {
@@ -85,7 +131,21 @@ export async function POST(req: Request) {
       });
     }
 
-    return NextResponse.json({ success: true, data: { userId: user._id.toString() } }, { status: 201 });
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:8080';
+    const verifyUrl = `${appUrl}/verify-email?token=${rawToken}`;
+    console.log('EMAIL VERIFICATION PLACEHOLDER:', verifyUrl);
+
+    return NextResponse.json(
+      {
+        success: true,
+        data: {
+          userId: user._id.toString(),
+          requiresEmailVerification: true,
+          message: 'Please verify your email address before signing in'
+        }
+      },
+      { status: 201 }
+    );
   } catch (error: any) {
     console.error('SIGNUP ERROR:', error);
     if (error?.code === 11000) {

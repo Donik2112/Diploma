@@ -15,6 +15,7 @@ export async function POST(req: Request) {
     if (!user) throw new ApiError('Invalid credentials', 401);
     const isValid = await bcrypt.compare(password, user.passwordHash);
     if (!isValid) throw new ApiError('Invalid credentials', 401);
+    if (!user.emailVerified) throw new ApiError('Please verify your email address before signing in', 403);
 
     const token = signAccessToken({ userId: user._id.toString(), role: user.role });
     const refreshToken = signRefreshToken({ userId: user._id.toString(), role: user.role });
