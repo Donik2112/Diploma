@@ -5,11 +5,17 @@ import { dbConnect } from '@/lib/mongodb';
 import User from '@/models/User';
 import StudentProfile from '@/models/StudentProfile';
 import ClientProfile from '@/models/ClientProfile';
+import { KAZAKHSTAN_UNIVERSITIES } from '@/lib/kazakhstanUniversities';
 
 const schema = z.object({
-  fullName: z.string({ required_error: 'Enter your full name' }).trim()
-    .min(1, 'Enter your full name')
-    .max(120),
+  firstName: z.string({ required_error: 'Enter your first name' }).trim()
+    .min(1, 'Enter your first name')
+    .min(2, 'First name must be at least 2 characters long')
+    .max(60),
+  lastName: z.string({ required_error: 'Enter your last name' }).trim()
+    .min(1, 'Enter your last name')
+    .min(2, 'Last name must be at least 2 characters long')
+    .max(60),
   email: z.string({ required_error: 'Enter your email' }).trim()
     .min(1, 'Enter your email')
     .email('Enter a valid email address'),
@@ -22,7 +28,10 @@ const schema = z.object({
   role: z.enum(['STUDENT', 'CLIENT'], {
     required_error: 'Select a role',
     invalid_type_error: 'Select a role'
-  })
+  }),
+  university: z.string({ required_error: 'Select your university' }).trim()
+    .min(1, 'Select your university')
+    .refine((v) => (KAZAKHSTAN_UNIVERSITIES as readonly string[]).includes(v), 'Select your university')
 });
 
 export async function POST(req: Request) {
@@ -37,6 +46,7 @@ export async function POST(req: Request) {
       );
     }
     const body = parsed.data;
+    const fullName = `${body.firstName} ${body.lastName}`.trim();
 
     if (await User.findOne({ email: body.email })) {
       return NextResponse.json(
@@ -47,10 +57,12 @@ export async function POST(req: Request) {
 
     const passwordHash = await bcrypt.hash(body.password, 10);
     const user = await User.create({
-      fullName: body.fullName,
+      fullName,
       email: body.email,
       role: body.role,
-      passwordHash
+      passwordHash,
+      university: body.university,
+      emailVerified: false
     });
 
     if (body.role === 'STUDENT') {
@@ -66,7 +78,7 @@ export async function POST(req: Request) {
     } else {
       await ClientProfile.create({
         userId: user._id,
-        companyName: `${body.fullName} Studio`,
+        companyName: `${fullName} Studio`,
         companyDescription: '',
         website: '',
         industry: ''
