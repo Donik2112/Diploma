@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import type { SortOrder } from 'mongoose';
 import Project from '@/models/Project';
 import { connectDB } from '@/lib/db';
 import { handleApi, ok } from '@/lib/api';
@@ -34,7 +35,11 @@ export async function GET(req: Request) {
     if (experienceLevel) filter.experienceLevel = experienceLevel;
     if (employmentType) filter.employmentType = employmentType;
 
-    const sortQuery = sort === 'budget_asc' ? { budgetMin: 1 } : sort === 'budget_desc' ? { budgetMax: -1 } : { createdAt: -1 };
+    const sortQuery: Record<string, SortOrder> = sort === 'budget_asc'
+      ? { budgetMin: 1 }
+      : sort === 'budget_desc'
+        ? { budgetMax: -1 }
+        : { createdAt: -1 };
     const projects = await Project.find(filter).sort(sortQuery).limit(100).lean();
     return ok(projects);
   });
