@@ -1,8 +1,8 @@
 import { z } from 'zod';
 import type { SortOrder } from 'mongoose';
+import { NextResponse } from 'next/server';
 import Project from '@/models/Project';
 import { connectDB } from '@/lib/db';
-import { handleApi, ok } from '@/lib/api';
 import { requireAuth } from '@/lib/auth';
 
 const createSchema = z.object({
@@ -19,7 +19,7 @@ const createSchema = z.object({
 }).refine((v) => v.budgetMax >= v.budgetMin, 'budgetMax must be greater than or equal to budgetMin');
 
 export async function GET(req: Request) {
-  return handleApi(async () => {
+  try {
     await connectDB();
     const { searchParams } = new URL(req.url);
     const q = searchParams.get('q') || '';
@@ -40,18 +40,25 @@ export async function GET(req: Request) {
       : sort === 'budget_desc'
         ? { budgetMax: -1 }
         : { createdAt: -1 };
+
     const projects = await Project.find(filter).sort(sortQuery).limit(100).lean();
-    return ok(projects);
-  });
+    return NextResponse.json({ success: true, data: projects });
+  } catch (error: any) {
+    console.error('PROJECTS ERROR:', error);
+    return NextResponse.json({ success: false, error: error?.message || 'Internal server error' }, { status: 500 });
+  }
 }
 
 export async function POST(req: Request) {
-  return handleApi(async () => {
+  try {
+    await connectDB();
     const user = requireAuth(['CLIENT', 'ADMIN']);
     const body = createSchema.parse(await req.json());
-    await connectDB();
 
-    const requiredSkills = Array.isArray(body.requiredSkills) ? body.requiredSkills : body.requiredSkills.split(',').map((x) => x.trim()).filter(Boolean);
+    const requiredSkills = Array.isArray(body.requiredSkills)
+      ? body.requiredSkills
+      : body.requiredSkills.split(',').map((x) => x.trim()).filter(Boolean);
+
     const project = await Project.create({
       clientId: user.userId,
       ...body,
@@ -59,6 +66,9 @@ export async function POST(req: Request) {
       deadline: body.deadline ? new Date(body.deadline) : new Date(Date.now() + 14 * 86400000)
     });
 
-    return ok(project, 201);
-  });
+    return NextResponse.json({ success: true, data: project }, { status: 201 });
+  } catch (error: any) {
+    console.error('PROJECTS CREATE ERROR:', error);
+    return NextResponse.json({ success: false, error: error?.message || 'Internal server error' }, { status: 500 });
+  }
 }

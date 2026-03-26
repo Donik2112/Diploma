@@ -1,37 +1,24 @@
 import mongoose from 'mongoose';
 
-type MongooseCache = {
-  conn: typeof mongoose | null;
-  promise: Promise<typeof mongoose> | null;
-};
+const MONGODB_URI = process.env.MONGODB_URI;
+
+if (!MONGODB_URI) {
+  throw new Error('MONGODB_URI is not defined');
+}
 
 declare global {
   // eslint-disable-next-line no-var
-  var mongooseCache: MongooseCache | undefined;
+  var mongooseCache: { conn: typeof mongoose | null; promise: Promise<typeof mongoose> | null } | undefined;
 }
 
-const cached: MongooseCache = global.mongooseCache || { conn: null, promise: null };
+const cached = global.mongooseCache || { conn: null, promise: null };
 global.mongooseCache = cached;
 
-function getMongoUri() {
-  const uri = process.env.MONGODB_URI;
-  if (!uri) {
-    throw new Error('MONGODB_URI is not defined in environment variables');
-  }
-  return uri;
-}
-
 export async function dbConnect() {
-  if (cached.conn) {
-    return cached.conn;
-  }
+  if (cached.conn) return cached.conn;
 
   if (!cached.promise) {
-    const uri = getMongoUri();
-    cached.promise = mongoose.connect(uri, {
-      dbName: 'diploma-platform',
-      serverSelectionTimeoutMS: 10000
-    });
+    cached.promise = mongoose.connect(MONGODB_URI);
   }
 
   cached.conn = await cached.promise;
