@@ -111,3 +111,13 @@ All demo users use password: `password123`
 - Add moderation logs, notifications, favorites, and payment gateway integration
 - Add unit/integration/E2E tests and CI/CD pipeline
 - Add advanced recommendation features with feature store and experiment tracking
+
+
+## Runtime 500 troubleshooting
+If `/api/auth/signup` and `/api/projects` both return `500`, check Mongo runtime config first.
+
+1. Verify `/api/test-db` response.
+2. Ensure `MONGODB_URI` is set in the runtime container environment (not only build-time).
+3. For Atlas, use:
+   `mongodb+srv://madi:<db_password>@cluster0.rnb3q.mongodb.net/diploma-platform?appName=Cluster0`
+4. If using Docker + local Mongo, do not use `localhost`; use service name (for example `mongo`).

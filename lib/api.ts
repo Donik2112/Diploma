@@ -20,7 +20,8 @@ export async function handleApi(fn: () => Promise<NextResponse>) {
   try {
     return await fn();
   } catch (error: any) {
-    if (error instanceof ApiError) return fail(error.message, error.status);
+    console.error('API ROUTE ERROR:', error);
+    if (error instanceof ApiError) return fail(error.message, error.status, process.env.NODE_ENV === 'development' ? error?.stack : undefined);
     return fail('Internal server error', 500, process.env.NODE_ENV === 'development' ? error?.message : undefined);
   }
 }
