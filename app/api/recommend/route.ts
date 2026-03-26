@@ -5,6 +5,8 @@ import RecommendationLog from '@/models/RecommendationLog';
 import { handleApi, ok } from '@/lib/api';
 import { getUserFromCookie } from '@/lib/auth';
 
+export const dynamic = 'force-dynamic';
+
 const schema = z.object({
   skills: z.array(z.string()).default([]),
   experience: z.string().default('JUNIOR'),
