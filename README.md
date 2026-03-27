@@ -122,9 +122,10 @@ If `/api/auth/signup` and `/api/projects` both return `500`, check Mongo runtime
    `mongodb+srv://madi:madi@cluster0.rnb3q.mongodb.net/Diploma?retryWrites=true&w=majority&appName=Cluster0`
 4. If using Docker + local Mongo, do not use `localhost`; use service name (for example `mongo`).
 
-## Email verification SMTP settings
-To send verification emails, configure:
-- `SMTP_USER`
-- `SMTP_PASS`
-- `SMTP_FROM`
-- `NEXT_PUBLIC_APP_URL`
+## Product language policy
+- All user-facing UI copy must remain **English-only**.
+- New pages/components should keep labels, placeholders, statuses, errors, and empty states in English.
+
+## Architecture docs
+- See `docs/ARCHITECTURE.md` for platform architecture, RBAC, recommendation strategy, and AI assistant integration approach.
+- See `prisma/schema.prisma` for migration-ready PostgreSQL relational schema.
