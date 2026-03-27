@@ -1,3 +1,6 @@
+import Link from 'next/link';
+import { verifyEmailToken } from '@/lib/emailVerification';
+
 export const dynamic = 'force-dynamic';
 
 type Props = {
@@ -8,28 +11,19 @@ type Props = {
 
 export default async function VerifyEmailPage({ searchParams }: Props) {
   const token = searchParams.token ?? '';
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:8080';
 
   let success = false;
   let message = 'Invalid or expired verification link';
 
   if (token) {
-    try {
-      const res = await fetch(
-        `${baseUrl}/api/auth/verify-email?token=${encodeURIComponent(token)}`,
-        { cache: 'no-store' }
-      );
+    const result = await verifyEmailToken(token);
+    success = result.success;
+    if (!result.success && result.error) {
+      message = result.error;
+    }
 
-      const data = await res.json().catch(() => null);
-
-      if (res.ok && data?.success) {
-        success = true;
-        message = 'Email verified successfully. You can now sign in.';
-      } else {
-        message = data?.error || message;
-      }
-    } catch {
-      message = 'Invalid or expired verification link';
+    if (result.success) {
+      message = 'Email verified successfully. You can now sign in.';
     }
   }
 
@@ -42,12 +36,12 @@ export default async function VerifyEmailPage({ searchParams }: Props) {
         </p>
 
         {success && (
-          <a
+          <Link
             href="/signin"
             className="mt-6 inline-flex rounded-lg bg-slate-900 px-4 py-2 text-white"
           >
             Go to sign in
-          </a>
+          </Link>
         )}
       </div>
     </main>

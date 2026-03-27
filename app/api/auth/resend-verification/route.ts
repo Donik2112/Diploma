@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server';
 import { dbConnect } from '@/lib/mongodb';
 import User from '@/models/User';
 import { sendVerificationEmail } from '@/lib/email';
+import { getAppUrl } from '@/lib/appUrl';
 import { requireAuth } from '@/lib/auth';
 
 export const dynamic = 'force-dynamic';
@@ -38,7 +39,7 @@ export async function POST() {
     user.emailVerificationExpiresAt = expiresAt;
     await user.save();
 
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:8080';
+    const appUrl = getAppUrl();
     const verifyUrl = `${appUrl}/verify-email?token=${rawToken}`;
 
     try {

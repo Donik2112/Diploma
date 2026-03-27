@@ -8,6 +8,7 @@ import StudentProfile from '@/models/StudentProfile';
 import ClientProfile from '@/models/ClientProfile';
 import { KAZAKHSTAN_UNIVERSITIES } from '@/lib/kazakhstanUniversities';
 import { sendVerificationEmail } from '@/lib/email';
+import { getAppUrl } from '@/lib/appUrl';
 
 export const dynamic = 'force-dynamic';
 
@@ -149,7 +150,7 @@ export async function POST(req: Request) {
       });
     }
 
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:8080';
+    const appUrl = getAppUrl();
     const verifyUrl = `${appUrl}/verify-email?token=${rawToken}`;
     let emailDeliveryFailed = false;
     try {
