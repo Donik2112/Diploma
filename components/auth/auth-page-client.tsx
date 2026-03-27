@@ -48,6 +48,7 @@ export default function AuthPageClient({ initialTab }: AuthPageClientProps) {
 
     const res = await fetch('/api/auth/signin', {
       method: 'POST',
+      credentials: 'include',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(Object.fromEntries(formData.entries()))
     });
@@ -67,6 +68,7 @@ export default function AuthPageClient({ initialTab }: AuthPageClientProps) {
 
     const role = payload.data.role;
     router.push(role === 'ADMIN' ? '/admin/dashboard' : role === 'CLIENT' ? '/client/dashboard' : '/student/dashboard');
+    router.refresh();
   }
 
   async function handleSignUp(formData: FormData) {
@@ -82,6 +84,7 @@ export default function AuthPageClient({ initialTab }: AuthPageClientProps) {
     const values = Object.fromEntries(formData.entries());
     const res = await fetch('/api/auth/signup', {
       method: 'POST',
+      credentials: 'include',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ ...values, captchaToken })
     });

@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 
 type Role = 'STUDENT' | 'CLIENT' | 'ADMIN';
 type AuthMe = { userId: string; role: Role };
@@ -13,12 +13,13 @@ export function Navbar() {
   const [logoutBusy, setLogoutBusy] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const router = useRouter();
+  const pathname = usePathname();
 
   useEffect(() => {
     let mounted = true;
-    (async () => {
+    const loadAuthUser = async () => {
       try {
-        const res = await fetch('/api/auth/me', { cache: 'no-store' });
+        const res = await fetch('/api/auth/me', { cache: 'no-store', credentials: 'include' });
         if (!mounted) return;
         if (!res.ok) {
           setAuthUser(null);
@@ -31,9 +32,30 @@ export function Navbar() {
       } finally {
         if (mounted) setLoading(false);
       }
-    })();
-    return () => { mounted = false; };
-  }, []);
+    };
+
+    loadAuthUser();
+    const onFocus = () => loadAuthUser();
+    window.addEventListener('focus', onFocus);
+
+    return () => {
+      mounted = false;
+      window.removeEventListener('focus', onFocus);
+    };
+  }, [pathname]);
+
+  async function logout() {
+    setLogoutBusy(true);
+    try {
+      await fetch('/api/auth/logout', { method: 'POST' });
+      setAuthUser(null);
+      router.push('/');
+      router.refresh();
+      setMobileOpen(false);
+    } finally {
+      setLogoutBusy(false);
+    }
+  }
 
   const roleLinks = useMemo(() => {
     if (!authUser) return [];
@@ -61,19 +83,6 @@ export function Navbar() {
     ['Projects', '/projects'],
     ['About', '/about']
   ] as const;
-
-  async function logout() {
-    setLogoutBusy(true);
-    try {
-      await fetch('/api/auth/logout', { method: 'POST' });
-      setAuthUser(null);
-      router.push('/');
-      router.refresh();
-      setMobileOpen(false);
-    } finally {
-      setLogoutBusy(false);
-    }
-  }
 
   return (
     <header className="sticky top-0 z-40 border-b border-slate-200 bg-white/95 backdrop-blur">
