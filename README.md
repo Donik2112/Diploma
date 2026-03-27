@@ -54,7 +54,7 @@ npm run dev
 - `npm run seed`
 
 ## Database Setup
-The app uses MongoDB. If you run with Docker, do not use `localhost` from inside the app container; use the Mongo service name (for example `mongodb://mongo:27017/diploma-platform`).
+The app uses MongoDB. Configure `MONGODB_URI` in runtime environment variables.
 
 ## API Endpoints
 ### Authentication
@@ -120,7 +120,6 @@ If `/api/auth/signup` and `/api/projects` both return `500`, check Mongo runtime
 2. Ensure `MONGODB_URI` is set in the runtime container environment (not only build-time).
 3. For Atlas, use:
    `mongodb+srv://madi:madi@cluster0.rnb3q.mongodb.net/Diploma?retryWrites=true&w=majority&appName=Cluster0`
-4. If using Docker + local Mongo, do not use `localhost`; use service name (for example `mongo`).
 
 ## Email verification SMTP settings
 To send verification emails, configure:
