@@ -14,6 +14,7 @@ export default function SignUpPage() {
   const [captchaToken, setCaptchaToken] = useState('');
   const [emailForResend, setEmailForResend] = useState('');
   const [canResendVerification, setCanResendVerification] = useState(false);
+  const [verificationUrl, setVerificationUrl] = useState('');
   const turnstileSiteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || '';
 
   useEffect(() => {
@@ -37,6 +38,7 @@ export default function SignUpPage() {
     setInfo('');
     setFieldErrors({});
     setCanResendVerification(false);
+    setVerificationUrl('');
 
     if (!captchaToken) {
       setFieldErrors({ captchaToken: 'Please complete the CAPTCHA' });
@@ -80,6 +82,9 @@ export default function SignUpPage() {
       if (payload?.emailDeliveryFailed) {
         setInfo('You can use the resend action below to get a new verification email.');
         setCanResendVerification(true);
+        if (typeof payload?.verificationUrl === 'string' && payload.verificationUrl) {
+          setVerificationUrl(payload.verificationUrl);
+        }
       }
     } catch {
       setError('Could not create the account. Please try again later');
@@ -166,6 +171,11 @@ export default function SignUpPage() {
         <button type="button" onClick={resendVerificationEmail} className="px-3 py-1 border rounded text-sm">
           Resend verification email
         </button>
+      )}
+      {verificationUrl && (
+        <a href={verificationUrl} className="px-3 py-1 border rounded text-sm inline-block">
+          Verify email now
+        </a>
       )}
       <p className="text-sm text-slate-600">
         Already have an account? <Link href="/signin" className="text-brand underline">Sign in</Link>
