@@ -74,6 +74,7 @@ async function verifyCaptcha(token: string, ip?: string | null) {
 }
 
 export async function POST(req: Request) {
+  let requestEmail = '';
   try {
     await dbConnect();
     const parsed = schema.safeParse(await req.json());
@@ -85,6 +86,7 @@ export async function POST(req: Request) {
       );
     }
     const body = parsed.data;
+    requestEmail = body.email;
     const fullName = `${body.firstName} ${body.lastName}`.trim();
     const isCaptchaValid = await verifyCaptcha(body.captchaToken, req.headers.get('x-forwarded-for'));
     if (!isCaptchaValid) {
@@ -94,7 +96,20 @@ export async function POST(req: Request) {
       );
     }
 
-    if (await User.findOne({ email: body.email })) {
+    const existingUser: any = await User.findOne({ email: body.email });
+    if (existingUser) {
+      if (!existingUser.emailVerified) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: 'An account with this email already exists but is not verified yet.',
+            field: 'email',
+            canResendVerification: true
+          },
+          { status: 409 }
+        );
+      }
+
       return NextResponse.json(
         { success: false, error: 'A user with this email already exists', field: 'email' },
         { status: 409 }
@@ -136,15 +151,28 @@ export async function POST(req: Request) {
 
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:8080';
     const verifyUrl = `${appUrl}/verify-email?token=${rawToken}`;
-    await sendVerificationEmail(body.email, verifyUrl);
+    let emailDeliveryFailed = false;
+    try {
+      await sendVerificationEmail(body.email, verifyUrl);
+    } catch (emailError) {
+      emailDeliveryFailed = true;
+      console.error('SIGNUP EMAIL SEND ERROR:', emailError);
+    }
+
+    const message = emailDeliveryFailed
+      ? 'Account created, but we could not send the verification email. Please try resending it.'
+      : 'Account created. Please check your email to verify your account.';
 
     return NextResponse.json(
       {
         success: true,
+        requiresEmailVerification: true,
+        emailDeliveryFailed,
+        message,
         data: {
           userId: user._id.toString(),
           requiresEmailVerification: true,
-          message: 'Account created. Please check your email to verify your account.'
+          emailDeliveryFailed
         }
       },
       { status: 201 }
@@ -152,6 +180,19 @@ export async function POST(req: Request) {
   } catch (error: any) {
     console.error('SIGNUP ERROR:', error);
     if (error?.code === 11000) {
+      const duplicateUser: any = requestEmail ? await User.findOne({ email: requestEmail }) : null;
+      if (duplicateUser && !duplicateUser.emailVerified) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: 'An account with this email already exists but is not verified yet.',
+            field: 'email',
+            canResendVerification: true
+          },
+          { status: 409 }
+        );
+      }
+
       return NextResponse.json(
         { success: false, error: 'A user with this email already exists', field: 'email' },
         { status: 409 }
