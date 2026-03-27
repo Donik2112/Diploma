@@ -32,9 +32,10 @@ function createTransporter() {
   });
 }
 
-function classifySmtpError(error: any) {
-  const message = String(error?.message || '').toLowerCase();
-  const code = String(error?.code || '');
+function classifySmtpError(error: unknown) {
+  const smtpError = error as { code?: unknown; message?: unknown } | null;
+  const message = String(smtpError?.message || '').toLowerCase();
+  const code = String(smtpError?.code || '');
 
   if (code === 'EAUTH' || message.includes('invalid login') || message.includes('username and password not accepted')) {
     return 'auth';
@@ -56,9 +57,10 @@ export async function verifyEmailTransport() {
     transportVerificationPromise = createTransporter()
       .verify()
       .then(() => true)
-      .catch((error) => {
+      .catch((error: unknown) => {
         const category = classifySmtpError(error);
-        console.error('[SMTP VERIFY ERROR]', { category, code: error?.code, message: error?.message });
+        const smtpError = error as { code?: unknown; message?: unknown } | null;
+        console.error('[SMTP VERIFY ERROR]', { category, code: smtpError?.code, message: smtpError?.message });
         return false;
       });
   }
