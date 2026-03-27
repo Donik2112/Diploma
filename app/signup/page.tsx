@@ -9,12 +9,8 @@ type FieldErrors = Partial<Record<'firstName' | 'lastName' | 'email' | 'password
 export default function SignUpPage() {
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
-  const [info, setInfo] = useState('');
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [captchaToken, setCaptchaToken] = useState('');
-  const [emailForResend, setEmailForResend] = useState('');
-  const [canResendVerification, setCanResendVerification] = useState(false);
-  const [verificationUrl, setVerificationUrl] = useState('');
   const turnstileSiteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || '';
 
   useEffect(() => {
@@ -35,10 +31,7 @@ export default function SignUpPage() {
   async function submit(formData: FormData) {
     setMessage('');
     setError('');
-    setInfo('');
     setFieldErrors({});
-    setCanResendVerification(false);
-    setVerificationUrl('');
 
     if (!captchaToken) {
       setFieldErrors({ captchaToken: 'Please complete the CAPTCHA' });
@@ -47,8 +40,6 @@ export default function SignUpPage() {
 
     try {
       const values = Object.fromEntries(formData.entries());
-      const email = String(formData.get('email') || '');
-      setEmailForResend(email);
       const res = await fetch('/api/auth/signup', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -66,7 +57,6 @@ export default function SignUpPage() {
         const backendMessage = typeof payload?.error === 'string' ? payload.error : '';
         const backendField = typeof payload?.field === 'string' ? payload.field : '';
         const fallback = 'Could not create the account. Please try again later';
-        setCanResendVerification(Boolean(payload?.canResendVerification));
 
         if (backendField && backendMessage) {
           setFieldErrors({ [backendField]: backendMessage } as FieldErrors);
@@ -77,39 +67,13 @@ export default function SignUpPage() {
       }
 
       setCaptchaToken('');
-      const backendMessage = payload?.message || payload?.data?.message || 'Please verify your email address before signing in';
+      const backendMessage = payload?.message || payload?.data?.message || 'Account created. You can sign in now.';
       setMessage(backendMessage);
-      if (payload?.emailDeliveryFailed) {
-        setInfo('You can use the resend action below to get a new verification email.');
-        setCanResendVerification(true);
-        if (typeof payload?.verificationUrl === 'string' && payload.verificationUrl) {
-          setVerificationUrl(payload.verificationUrl);
-        }
-      }
     } catch {
       setError('Could not create the account. Please try again later');
     }
   }
 
-  async function resendVerificationEmail() {
-    if (!emailForResend) {
-      setError('Enter your email');
-      return;
-    }
-
-    setInfo('');
-    const res = await fetch('/api/auth/resend-verification', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: emailForResend })
-    });
-    const payload = await res.json();
-    if (!res.ok || !payload?.success) {
-      setError(payload?.error || 'Could not resend verification email. Please try again later');
-      return;
-    }
-    setInfo(payload?.data?.message || 'Verification email sent.');
-  }
 
   return (
     <form action={submit} className="card p-6 max-w-lg mx-auto space-y-3">
@@ -165,18 +129,7 @@ export default function SignUpPage() {
 
       <button className="px-4 py-2 bg-brand text-white rounded">Create account</button>
       {message && <p className="text-sm text-green-700">{message}</p>}
-      {info && <p className="text-sm text-slate-700">{info}</p>}
       {error && <p className="text-sm text-red-700">{error}</p>}
-      {canResendVerification && (
-        <button type="button" onClick={resendVerificationEmail} className="px-3 py-1 border rounded text-sm">
-          Resend verification email
-        </button>
-      )}
-      {verificationUrl && (
-        <a href={verificationUrl} className="px-3 py-1 border rounded text-sm inline-block">
-          Verify email now
-        </a>
-      )}
       <p className="text-sm text-slate-600">
         Already have an account? <Link href="/signin" className="text-brand underline">Sign in</Link>
       </p>

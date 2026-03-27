@@ -1,3 +1,11 @@
 /** @type {import('next').NextConfig} */
-const nextConfig = { experimental: { serverActions: { allowedOrigins: ['*'] } } };
+const nextConfig = {
+  output: 'standalone',
+  experimental: {
+    serverActions: {
+      allowedOrigins: ['*']
+    }
+  }
+};
+
 export default nextConfig;

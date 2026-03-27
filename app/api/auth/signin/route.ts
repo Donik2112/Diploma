@@ -24,21 +24,11 @@ export async function POST(req: Request) {
       return NextResponse.json({ success: false, error: 'Invalid credentials' }, { status: 401 });
     }
 
-    if (!user.emailVerified) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: 'Please verify your email address before signing in',
-          needsVerification: true
-        },
-        { status: 403 }
-      );
-    }
 
     const token = signAccessToken({ userId: user._id.toString(), role: user.role });
     const refreshToken = signRefreshToken({ userId: user._id.toString(), role: user.role });
 
-    const response = NextResponse.json({ success: true, data: { role: user.role, fullName: user.fullName } });
+    const response = NextResponse.json({ success: true, data: { role: user.role, fullName: user.fullName, emailVerified: Boolean(user.emailVerified) } });
     response.cookies.set('token', token, { httpOnly: true, path: '/', sameSite: 'lax', secure: process.env.NODE_ENV === 'production' });
     response.cookies.set('refresh_token', refreshToken, { httpOnly: true, path: '/', sameSite: 'lax', secure: process.env.NODE_ENV === 'production' });
     return response;
