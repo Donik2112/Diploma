@@ -1,4 +1,123 @@
-import { Card } from '@/components/ui/card';
+'use client';
+
+import { useEffect, useState } from 'react';
+import Link from 'next/link';
+
 export default function StudentDashboard() {
-  return <div className="space-y-4"><h1 className="text-3xl font-bold">Student Dashboard</h1><div className="grid md:grid-cols-4 gap-4"><Card title="Applications sent" value={14} /><Card title="Accepted applications" value={4} /><Card title="Average match score" value="82%" /><Card title="Profile completion" value="88%" /></div><div className="card p-4">Recommendation source: fallback demo engine</div></div>;
+  const [applications, setApplications] = useState<any[]>([]);
+  const [recommendations, setRecommendations] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const [appRes, recRes] = await Promise.all([
+          fetch('/api/applications'),
+          fetch('/api/recommend', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ skills: ['React', 'TypeScript', 'UI'], experience: 'JUNIOR', top_n: 5 })
+          })
+        ]);
+        const appData = await appRes.json();
+        const recData = await recRes.json();
+        setApplications(appData?.data || []);
+        setRecommendations(recData?.data?.recommendations || []);
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, []);
+
+  const sent = applications.length;
+  const accepted = applications.filter((x) => x.status === 'ACCEPTED').length;
+  const inProgress = applications.filter((x) => x.status === 'SENT').length;
+  const profileCompletion = 82;
+
+  return (
+    <div className="space-y-6 py-2">
+      <section className="card p-7 md:p-10">
+        <p className="text-sm font-medium text-blue-700">Student workspace</p>
+        <h1 className="section-title mt-1">Welcome back, build your next project milestone</h1>
+        <p className="muted mt-2 max-w-2xl">
+          Track applications, explore recommendation matches, and keep your profile market-ready.
+        </p>
+        <div className="mt-5 flex flex-wrap gap-3">
+          <Link href="/projects" className="btn-primary">Browse projects</Link>
+          <Link href="/student/profile" className="btn-secondary">Update profile</Link>
+        </div>
+      </section>
+
+      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        {[
+          ['Applications sent', sent, 'Total submitted'],
+          ['Accepted', accepted, 'Confirmed opportunities'],
+          ['In progress', inProgress, 'Active discussions'],
+          ['Profile completion', `${profileCompletion}%`, 'Improve visibility']
+        ].map(([title, value, hint]) => (
+          <div key={title} className="card p-5">
+            <p className="text-sm text-slate-500">{title}</p>
+            <p className="mt-2 text-3xl font-semibold text-slate-900">{value}</p>
+            <p className="mt-1 text-xs text-slate-500">{hint}</p>
+          </div>
+        ))}
+      </section>
+
+      <section className="grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
+        <div className="card p-6">
+          <div className="flex items-center justify-between">
+            <h2 className="text-xl font-semibold text-slate-900">Recommended for you</h2>
+            <Link href="/student/recommendations" className="text-sm font-semibold text-blue-700">See all</Link>
+          </div>
+          {loading ? (
+            <div className="mt-4 space-y-3">
+              {Array.from({ length: 3 }).map((_, idx) => <div key={idx} className="h-20 animate-pulse rounded-2xl bg-slate-100" />)}
+            </div>
+          ) : recommendations.length ? (
+            <div className="mt-4 space-y-3">
+              {recommendations.slice(0, 4).map((rec: any, idx: number) => (
+                <div key={idx} className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="font-semibold text-slate-900">{rec.title || `Recommended project #${idx + 1}`}</p>
+                      <p className="mt-1 text-sm text-slate-600">{rec.reason || rec.explanation || 'Based on your skills and profile history.'}</p>
+                    </div>
+                    <span className="status-pill bg-blue-100 text-blue-700">{Math.round((rec.matchScore || rec.score || 0.8) * 100)}% match</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="mt-5 rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-6 text-center">
+              <p className="text-2xl">✨</p>
+              <p className="mt-2 font-semibold text-slate-900">No recommendations yet</p>
+              <p className="mt-1 text-sm text-slate-600">Complete your profile and add skills to unlock better matches.</p>
+            </div>
+          )}
+        </div>
+
+        <div className="space-y-6">
+          <div className="card p-6">
+            <h3 className="text-lg font-semibold text-slate-900">AI insights</h3>
+            <ul className="mt-3 space-y-2 text-sm text-slate-600">
+              <li className="rounded-xl bg-slate-50 p-3">Add 2 portfolio cases to increase profile conversion by ~24%.</li>
+              <li className="rounded-xl bg-slate-50 p-3">Projects with React + API integration currently have strong demand.</li>
+              <li className="rounded-xl bg-slate-50 p-3">Reply within 12 hours to improve acceptance probability.</li>
+            </ul>
+          </div>
+          <div className="card p-6">
+            <h3 className="text-lg font-semibold text-slate-900">Recent activity</h3>
+            <div className="mt-3 space-y-2 text-sm text-slate-600">
+              {applications.slice(0, 3).map((x: any) => (
+                <div key={x._id} className="rounded-xl border border-slate-200 p-3">
+                  Application <span className="font-semibold text-slate-900">{x.status}</span> · {new Date(x.createdAt).toLocaleDateString()}
+                </div>
+              ))}
+              {!applications.length && <p className="text-slate-500">No activity yet. Start from project catalog.</p>}
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+  );
 }

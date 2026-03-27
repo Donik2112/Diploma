@@ -5,16 +5,13 @@ import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 
 type Role = 'STUDENT' | 'CLIENT' | 'ADMIN';
-
-type AuthMe = {
-  userId: string;
-  role: Role;
-};
+type AuthMe = { userId: string; role: Role };
 
 export function Navbar() {
   const [authUser, setAuthUser] = useState<AuthMe | null>(null);
   const [loading, setLoading] = useState(true);
   const [logoutBusy, setLogoutBusy] = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
   const router = useRouter();
 
   useEffect(() => {
@@ -35,35 +32,35 @@ export function Navbar() {
         if (mounted) setLoading(false);
       }
     })();
-    return () => {
-      mounted = false;
-    };
+    return () => { mounted = false; };
   }, []);
 
   const roleLinks = useMemo(() => {
     if (!authUser) return [];
-    if (authUser.role === 'STUDENT') {
-      return [
-        ['Dashboard', '/student/dashboard'],
-        ['Profile', '/student/profile'],
-        ['Applications', '/student/applications'],
-        ['Messages', '/student/messages']
-      ] as const;
-    }
-    if (authUser.role === 'CLIENT') {
-      return [
-        ['Dashboard', '/client/dashboard'],
-        ['My Projects', '/client/projects'],
-        ['Applicants', '/client/applicants']
-      ] as const;
-    }
+    if (authUser.role === 'STUDENT') return [
+      ['Dashboard', '/student/dashboard'],
+      ['Applications', '/student/applications'],
+      ['Messages', '/student/messages'],
+      ['Profile', '/student/profile']
+    ] as const;
+    if (authUser.role === 'CLIENT') return [
+      ['Dashboard', '/client/dashboard'],
+      ['My Projects', '/client/projects'],
+      ['Applicants', '/client/applicants']
+    ] as const;
     return [
       ['Admin', '/admin/dashboard'],
       ['Analytics', '/admin/analytics'],
       ['Users', '/admin/users'],
-      ['Projects', '/admin/projects']
+      ['Moderation', '/admin/projects']
     ] as const;
   }, [authUser]);
+
+  const publicLinks = [
+    ['Home', '/'],
+    ['Projects', '/projects'],
+    ['About', '/about']
+  ] as const;
 
   async function logout() {
     setLogoutBusy(true);
@@ -72,79 +69,91 @@ export function Navbar() {
       setAuthUser(null);
       router.push('/');
       router.refresh();
+      setMobileOpen(false);
     } finally {
       setLogoutBusy(false);
     }
   }
 
   return (
-    <header className="sticky top-0 z-40 border-b border-slate-200/80 bg-white/90 backdrop-blur">
-      <div className="container-app h-20 flex items-center justify-between gap-4">
+    <header className="sticky top-0 z-40 border-b border-slate-200 bg-white/95 backdrop-blur">
+      <div className="container-app flex h-16 items-center justify-between gap-4 lg:h-20">
         <div className="flex items-center gap-3">
           <Link href="/" className="flex items-center gap-3">
-            <span className="inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-slate-900 text-white font-bold shadow-sm">
-              U
-            </span>
+            <span className="inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-blue-600 text-white font-bold shadow-sm">U</span>
             <div>
-              <p className="text-sm text-slate-500 leading-tight">Marketplace</p>
+              <p className="text-xs text-slate-500 leading-tight">Marketplace</p>
               <p className="font-semibold text-slate-900 leading-tight">UniWork</p>
             </div>
           </Link>
-          <span className="hidden lg:inline-flex rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-700">
+          <span className="hidden xl:inline-flex rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">
             Verified students
           </span>
         </div>
 
-        <nav className="hidden lg:flex items-center gap-2">
-          {[
-            ['Home', '/'],
-            ['Projects', '/projects'],
-            ['About', '/about']
-          ].map(([label, href]) => (
-            <Link key={href} href={href} className="rounded-xl px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition">
+        <nav className="hidden lg:flex items-center gap-1">
+          {publicLinks.map(([label, href]) => (
+            <Link key={href} href={href} className="rounded-lg px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-900">
               {label}
             </Link>
           ))}
-
           {roleLinks.map(([label, href]) => (
-            <Link key={href} href={href} className="rounded-xl px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition">
+            <Link key={href} href={href} className="rounded-lg px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-900">
               {label}
             </Link>
           ))}
         </nav>
 
-        <div className="flex items-center gap-2">
+        <div className="hidden lg:flex items-center gap-2">
           {!loading && !authUser && (
             <>
-              <Link href="/signin" className="rounded-xl px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100 transition">
-                Sign in
-              </Link>
-              <Link href="/signin?tab=signup" className="rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-slate-800 transition">
-                Get started
-              </Link>
+              <Link href="/signin" className="btn-secondary">Sign in</Link>
+              <Link href="/signin?tab=signup" className="btn-primary">Create account</Link>
             </>
           )}
-
           {!loading && authUser && (
             <>
-              <Link
-                href={authUser.role === 'STUDENT' ? '/student/dashboard' : authUser.role === 'CLIENT' ? '/client/dashboard' : '/admin/dashboard'}
-                className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 transition"
-              >
+              <Link href={authUser.role === 'STUDENT' ? '/student/dashboard' : authUser.role === 'CLIENT' ? '/client/dashboard' : '/admin/dashboard'} className="btn-secondary">
                 Account
               </Link>
-              <button
-                type="button"
-                onClick={logout}
-                disabled={logoutBusy}
-                className="rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-slate-800 transition disabled:opacity-50"
-              >
+              <button type="button" onClick={logout} disabled={logoutBusy} className="btn-primary disabled:opacity-50">
                 {logoutBusy ? 'Signing out...' : 'Sign out'}
               </button>
             </>
           )}
         </div>
+
+        <button
+          type="button"
+          onClick={() => setMobileOpen((x) => !x)}
+          className="rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700 lg:hidden"
+        >
+          Menu
+        </button>
       </div>
+
+      {mobileOpen && (
+        <div className="border-t border-slate-200 bg-white lg:hidden">
+          <div className="container-app grid gap-2 py-4">
+            {[...publicLinks, ...roleLinks].map(([label, href]) => (
+              <Link key={href} href={href} onClick={() => setMobileOpen(false)} className="rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700">
+                {label}
+              </Link>
+            ))}
+            {!loading && !authUser && (
+              <>
+                <Link href="/signin" onClick={() => setMobileOpen(false)} className="btn-secondary">Sign in</Link>
+                <Link href="/signin?tab=signup" onClick={() => setMobileOpen(false)} className="btn-primary">Create account</Link>
+              </>
+            )}
+            {!loading && authUser && (
+              <button type="button" onClick={logout} disabled={logoutBusy} className="btn-primary disabled:opacity-50">
+                {logoutBusy ? 'Signing out...' : 'Sign out'}
+              </button>
+            )}
+          </div>
+        </div>
+      )}
     </header>
   );
 }
