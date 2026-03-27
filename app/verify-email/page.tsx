@@ -1,54 +1,55 @@
-'use client';
-
-import Link from 'next/link';
-import { useEffect, useState } from 'react';
-import { useSearchParams } from 'next/navigation';
-
 export const dynamic = 'force-dynamic';
 
-export default function VerifyEmailPage() {
-  const searchParams = useSearchParams();
-  const token = searchParams?.get('token') ?? '';
-  const [loading, setLoading] = useState(true);
-  const [success, setSuccess] = useState(false);
+type Props = {
+  searchParams: {
+    token?: string;
+  };
+};
 
-  useEffect(() => {
-    async function verify() {
-      if (!token) {
-        setSuccess(false);
-        setLoading(false);
-        return;
-      }
+export default async function VerifyEmailPage({ searchParams }: Props) {
+  const token = searchParams.token ?? '';
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:8080';
 
-      try {
-        const res = await fetch(`/api/auth/verify-email?token=${encodeURIComponent(token)}`);
-        const data = await res.json();
-        setSuccess(Boolean(res.ok && data?.success));
-      } catch {
-        setSuccess(false);
-      } finally {
-        setLoading(false);
+  let success = false;
+  let message = 'Invalid or expired verification link';
+
+  if (token) {
+    try {
+      const res = await fetch(
+        `${baseUrl}/api/auth/verify-email?token=${encodeURIComponent(token)}`,
+        { cache: 'no-store' }
+      );
+
+      const data = await res.json().catch(() => null);
+
+      if (res.ok && data?.success) {
+        success = true;
+        message = 'Email verified successfully. You can now sign in.';
+      } else {
+        message = data?.error || message;
       }
+    } catch {
+      message = 'Invalid or expired verification link';
     }
-
-    verify();
-  }, [token]);
-
-  if (loading) {
-    return <div className="mx-auto max-w-md rounded-2xl border bg-white p-8 shadow-sm">Verifying your email...</div>;
   }
 
   return (
-    <div className="mx-auto max-w-md rounded-2xl border bg-white p-8 shadow-sm space-y-4">
-      <h1 className="text-2xl font-bold">Verify email</h1>
-      {success ? (
-        <>
-          <p className="text-green-700">Email verified successfully. You can now sign in.</p>
-          <Link href="/signin" className="px-3 py-1 border rounded text-sm inline-block">Go to sign in</Link>
-        </>
-      ) : (
-        <p className="text-red-600">Invalid or expired verification link</p>
-      )}
-    </div>
+    <main className="mx-auto max-w-md px-6 py-16">
+      <div className="rounded-2xl border border-slate-200 bg-white p-8 shadow-sm">
+        <h1 className="text-2xl font-bold text-slate-900">Verify email</h1>
+        <p className={`mt-4 ${success ? 'text-green-600' : 'text-red-600'}`}>
+          {message}
+        </p>
+
+        {success && (
+          <a
+            href="/signin"
+            className="mt-6 inline-flex rounded-lg bg-slate-900 px-4 py-2 text-white"
+          >
+            Go to sign in
+          </a>
+        )}
+      </div>
+    </main>
   );
 }
