@@ -12,7 +12,7 @@ type FieldErrors = Partial<Record<'firstName' | 'lastName' | 'email' | 'password
 export default function SignInPage() {
   const searchParams = useSearchParams();
   const router = useRouter();
-  const initialTab = searchParams.get('tab') === 'signup' ? 'signup' : 'signin';
+  const initialTab = searchParams?.get('tab') === 'signup' ? 'signup' : 'signin';
 
   const [tab, setTab] = useState<Tab>(initialTab);
   const [error, setError] = useState('');
