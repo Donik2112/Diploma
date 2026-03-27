@@ -1,8 +1,13 @@
+import { createHash } from 'crypto';
 import { NextResponse } from 'next/server';
 import { dbConnect } from '@/lib/mongodb';
 import User from '@/models/User';
 
 export const dynamic = 'force-dynamic';
+
+function hashToken(token: string) {
+  return createHash('sha256').update(token).digest('hex');
+}
 
 export async function GET(req: Request) {
   try {
@@ -18,8 +23,10 @@ export async function GET(req: Request) {
       );
     }
 
+    const tokenHash = hashToken(token);
+
     const user = await User.findOne({
-      emailVerificationToken: token,
+      emailVerificationToken: tokenHash
     });
 
     if (!user) {
