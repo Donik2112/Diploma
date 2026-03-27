@@ -1,74 +1,55 @@
-import Link from 'next/link';
-import { headers } from 'next/headers';
-
 export const dynamic = 'force-dynamic';
 
-type VerifyEmailPageProps = {
+type Props = {
   searchParams: {
-    token?: string | string[];
+    token?: string;
   };
 };
 
-function getToken(searchParams: VerifyEmailPageProps['searchParams']) {
-  const rawToken = searchParams?.token;
+export default async function VerifyEmailPage({ searchParams }: Props) {
+  const token = searchParams.token ?? '';
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:8080';
 
-  if (Array.isArray(rawToken)) {
-    return rawToken[0] ?? '';
-  }
+  let success = false;
+  let message = 'Invalid or expired verification link';
 
-  return rawToken ?? '';
-}
+  if (token) {
+    try {
+      const res = await fetch(
+        `${baseUrl}/api/auth/verify-email?token=${encodeURIComponent(token)}`,
+        { cache: 'no-store' }
+      );
 
-async function verifyToken(token: string) {
-  if (!token) {
-    return false;
-  }
+      const data = await res.json().catch(() => null);
 
-  try {
-    const requestHeaders = headers();
-    const host = requestHeaders.get('x-forwarded-host') ?? requestHeaders.get('host');
-    const protocol = requestHeaders.get('x-forwarded-proto') ?? 'http';
-
-    if (!host) {
-      return false;
-    }
-
-    const response = await fetch(
-      `${protocol}://${host}/api/auth/verify-email?token=${encodeURIComponent(token)}`,
-      {
-        method: 'GET',
-        cache: 'no-store'
+      if (res.ok && data?.success) {
+        success = true;
+        message = 'Email verified successfully. You can now sign in.';
+      } else {
+        message = data?.error || message;
       }
-    );
-
-    if (!response.ok) {
-      return false;
+    } catch {
+      message = 'Invalid or expired verification link';
     }
-
-    const data = await response.json();
-    return Boolean(data?.success);
-  } catch {
-    return false;
   }
-}
-
-export default async function VerifyEmailPage({ searchParams }: VerifyEmailPageProps) {
-  const token = getToken(searchParams);
-  const success = await verifyToken(token);
 
   return (
-    <div className="mx-auto max-w-md rounded-2xl border bg-white p-8 shadow-sm space-y-4">
-      <h1 className="text-2xl font-bold">Verify email</h1>
-      {success ? (
-        <>
-          <p className="text-green-700">Email verified successfully. You can now sign in.</p>
-          <Link href="/signin" className="px-3 py-1 border rounded text-sm inline-block">
+    <main className="mx-auto max-w-md px-6 py-16">
+      <div className="rounded-2xl border border-slate-200 bg-white p-8 shadow-sm">
+        <h1 className="text-2xl font-bold text-slate-900">Verify email</h1>
+        <p className={`mt-4 ${success ? 'text-green-600' : 'text-red-600'}`}>
+          {message}
+        </p>
+
+        {success && (
+          <a
+            href="/signin"
+            className="mt-6 inline-flex rounded-lg bg-slate-900 px-4 py-2 text-white"
+          >
             Go to sign in
-          </Link>
-        </>
-      ) : (
-        <p className="text-red-600">Invalid or expired verification link</p>
-      )}
-    </div>
+          </a>
+        )}
+      </div>
+    </main>
   );
 }
