@@ -124,8 +124,6 @@ If `/api/auth/signup` and `/api/projects` both return `500`, check Mongo runtime
 
 ## Email verification SMTP settings
 To send verification emails, configure:
-- `SMTP_HOST`
-- `SMTP_PORT`
 - `SMTP_USER`
 - `SMTP_PASS`
 - `SMTP_FROM`

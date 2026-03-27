@@ -1,44 +1,93 @@
 import nodemailer from 'nodemailer';
 
-function getSmtpConfig() {
-  const host = process.env.SMTP_HOST;
-  const port = Number(process.env.SMTP_PORT || 0);
+type SmtpConfig = {
+  user: string;
+  pass: string;
+  from: string;
+};
+
+let transportVerificationPromise: Promise<boolean> | null = null;
+
+function getSmtpConfig(): SmtpConfig {
   const user = process.env.SMTP_USER;
   const pass = process.env.SMTP_PASS;
   const from = process.env.SMTP_FROM;
 
-  if (!host || !port || !user || !pass || !from) {
+  if (!user || !pass || !from) {
     throw new Error('SMTP configuration is missing');
   }
 
-  return { host, port, user, pass, from };
+  return { user, pass, from };
 }
 
 function createTransporter() {
-  const { host, port, user, pass } = getSmtpConfig();
+  const { user, pass } = getSmtpConfig();
   return nodemailer.createTransport({
-    host,
-    port,
-    secure: port === 465,
-    auth: { user, pass }
+    service: 'gmail',
+    auth: { user, pass },
+    connectionTimeout: 15_000,
+    greetingTimeout: 10_000,
+    socketTimeout: 20_000,
+    tls: { rejectUnauthorized: true }
   });
+}
+
+function classifySmtpError(error: any) {
+  const message = String(error?.message || '').toLowerCase();
+  const code = String(error?.code || '');
+
+  if (code === 'EAUTH' || message.includes('invalid login') || message.includes('username and password not accepted')) {
+    return 'auth';
+  }
+  if (code === 'ETIMEDOUT' || message.includes('timeout') || message.includes('connection timeout')) {
+    return 'timeout';
+  }
+  if (code === 'ECONNECTION' || message.includes('connection') || message.includes('network')) {
+    return 'network';
+  }
+  if (message.includes('tls') || message.includes('certificate')) {
+    return 'tls';
+  }
+  return 'unknown';
+}
+
+export async function verifyEmailTransport() {
+  if (!transportVerificationPromise) {
+    transportVerificationPromise = createTransporter()
+      .verify()
+      .then(() => true)
+      .catch((error) => {
+        const category = classifySmtpError(error);
+        console.error('[SMTP VERIFY ERROR]', { category, code: error?.code, message: error?.message });
+        return false;
+      });
+  }
+  return transportVerificationPromise;
 }
 
 export async function sendVerificationEmail(email: string, verifyUrl: string) {
   const { from } = getSmtpConfig();
   const transporter = createTransporter();
 
-  await transporter.sendMail({
-    from,
-    to: email,
-    subject: 'Verify your email address',
-    text: [
-      'Welcome to UniWork!',
-      '',
-      'Please verify your email address by opening the link below:',
-      verifyUrl,
-      '',
-      'This verification link expires in 24 hours.'
-    ].join('\n')
-  });
+  await verifyEmailTransport();
+
+  try {
+    await transporter.sendMail({
+      from,
+      to: email,
+      subject: 'Verify your email address',
+      text: [
+        'Welcome to UniWork!',
+        '',
+        'Please verify your email address by opening the link below:',
+        verifyUrl,
+        '',
+        'This verification link expires in 24 hours.'
+      ].join('\n')
+    });
+  } catch (error: any) {
+    const category = classifySmtpError(error);
+    console.error('[SMTP SEND ERROR]', { category, code: error?.code, command: error?.command, message: error?.message });
+    throw error;
+  }
 }

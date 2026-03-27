@@ -157,6 +157,7 @@ export async function POST(req: Request) {
     } catch (emailError) {
       emailDeliveryFailed = true;
       console.error('SIGNUP EMAIL SEND ERROR:', emailError);
+      console.log('EMAIL VERIFICATION FALLBACK URL:', verifyUrl);
     }
 
     const message = emailDeliveryFailed
