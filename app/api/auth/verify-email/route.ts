@@ -14,7 +14,7 @@ export async function GET(req: Request) {
     const token = new URL(req.url).searchParams.get('token');
     if (!token) {
       return NextResponse.json(
-        { success: false, error: 'This verification link is invalid or has expired' },
+        { success: false, error: 'Invalid or expired verification link' },
         { status: 400 }
       );
     }
@@ -28,7 +28,7 @@ export async function GET(req: Request) {
 
     if (!user) {
       return NextResponse.json(
-        { success: false, error: 'This verification link is invalid or has expired' },
+        { success: false, error: 'Invalid or expired verification link' },
         { status: 400 }
       );
     }
@@ -38,11 +38,11 @@ export async function GET(req: Request) {
     user.emailVerificationExpiresAt = undefined;
     await user.save();
 
-    return NextResponse.json({ success: true, data: { message: 'Your email has been verified successfully' } });
+    return NextResponse.json({ success: true });
   } catch (error) {
     console.error('VERIFY EMAIL ERROR:', error);
     return NextResponse.json(
-      { success: false, error: 'This verification link is invalid or has expired' },
+      { success: false, error: 'Invalid or expired verification link' },
       { status: 500 }
     );
   }
