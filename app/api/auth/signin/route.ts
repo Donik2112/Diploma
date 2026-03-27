@@ -24,17 +24,6 @@ export async function POST(req: Request) {
       return NextResponse.json({ success: false, error: 'Invalid credentials' }, { status: 401 });
     }
 
-    if (!user.emailVerified) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: 'Please verify your email address before signing in',
-          needsVerification: true
-        },
-        { status: 403 }
-      );
-    }
-
     const token = signAccessToken({ userId: user._id.toString(), role: user.role });
     const refreshToken = signRefreshToken({ userId: user._id.toString(), role: user.role });
 
