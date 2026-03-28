@@ -11,12 +11,14 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
 
     const mlApiUrl = process.env.ML_API_URL;
+    console.log('ML_API_URL =', mlApiUrl);
     if (!mlApiUrl) {
       return NextResponse.json(
         { error: 'ML_API_URL is not configured' },
         { status: 500 }
       );
     }
+    console.log('Calling HF model...');
 
     const startRes = await fetch(`${mlApiUrl}/gradio_api/call/gradio_recommend`, {
       method: 'POST',
@@ -90,9 +92,9 @@ export async function POST(req: NextRequest) {
       { status: 504 }
     );
   } catch (error) {
-    console.error('Recommend API error:', error);
+    console.error('Recommend route error:', error);
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { error: 'ML request failed', details: String(error) },
       { status: 500 }
     );
   }
