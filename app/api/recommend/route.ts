@@ -1,46 +1,83 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { getUserFromCookie } from '@/lib/auth';
+import { dbConnect } from '@/lib/mongodb';
+import StudentProfile from '@/models/StudentProfile';
 
 async function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function toStringList(value: unknown): string[] {
+  if (Array.isArray(value)) return value.map((x) => String(x).trim()).filter(Boolean);
+  if (typeof value === 'string') return value.split(',').map((x) => x.trim()).filter(Boolean);
+  return [];
+}
+
+function getProfileCompletionHints(profile: any) {
+  const missing: string[] = [];
+  if (!profile?.skills?.length) missing.push('skills');
+  if (!profile?.city) missing.push('city');
+  if (!profile?.experienceLevel) missing.push('experienceLevel');
+  if (!profile?.interests?.length) missing.push('interests');
+  return missing;
+}
+
+function normalizeRecommendations(raw: any): any[] {
+  if (Array.isArray(raw)) return raw;
+  if (Array.isArray(raw?.data)) return raw.data;
+  if (Array.isArray(raw?.recommendations)) return raw.recommendations;
+  if (Array.isArray(raw?.[0])) return raw[0];
+  return [];
 }
 
 export const dynamic = 'force-dynamic';
 
 export async function POST(req: NextRequest) {
   try {
-    const body = await req.json();
-
+    const body = await req.json().catch(() => ({}));
     const mlApiUrl = process.env.ML_API_URL;
-    console.log('ML_API_URL =', mlApiUrl);
+    console.log('ML_API_URL =', mlApiUrl || 'undefined');
+    console.log('Using fallback demo engine: disabled');
     if (!mlApiUrl) {
-      return NextResponse.json(
-        { error: 'ML_API_URL is not configured' },
-        { status: 500 }
-      );
+      return NextResponse.json({ error: 'ML_API_URL is not configured' }, { status: 500 });
     }
-    console.log('Calling HF model...');
 
+    const authUser = getUserFromCookie();
+    let profile: any = null;
+    if (authUser?.role === 'STUDENT') {
+      await dbConnect();
+      profile = await StudentProfile.findOne({ userId: authUser.userId }).lean();
+    }
+
+    const payload = {
+      skills: body.skills || toStringList(profile?.skills).join(', '),
+      experience: body.experience || profile?.experienceLevel || 'JUNIOR',
+      employment: body.employment || '',
+      city: body.city || profile?.city || '',
+      interests: body.interests || toStringList(profile?.interests).join(', '),
+      top_n: body.top_n || 10,
+      strict_city: body.strict_city || false
+    };
+
+    const missing = getProfileCompletionHints(profile);
+    console.log('Calling HF model...');
     const startRes = await fetch(`${mlApiUrl}/gradio_api/call/gradio_recommend`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         data: [
-          body.skills || '',
-          body.experience || '',
-          body.employment || '',
-          body.city || '',
-          body.interests || '',
-          body.top_n || 10,
-          body.strict_city || false
+          payload.skills,
+          payload.experience,
+          payload.employment,
+          payload.city,
+          payload.interests,
+          payload.top_n,
+          payload.strict_city
         ]
       }),
       cache: 'no-store'
     });
-
     const startData = await startRes.json();
-
     if (!startRes.ok) {
       return NextResponse.json(
         { error: 'Failed to start ML request', details: startData },
@@ -50,47 +87,34 @@ export async function POST(req: NextRequest) {
 
     const eventId = startData.event_id;
     if (!eventId) {
-      return NextResponse.json(
-        { error: 'No event_id returned from Gradio', details: startData },
-        { status: 500 }
-      );
+      return NextResponse.json({ error: 'No event_id returned from Gradio', details: startData }, { status: 500 });
     }
 
     const resultUrl = `${mlApiUrl}/gradio_api/call/gradio_recommend/${eventId}`;
-
     for (let i = 0; i < 20; i++) {
       await sleep(1500);
-
-      const resultRes = await fetch(resultUrl, {
-        method: 'GET',
-        cache: 'no-store'
-      });
-
+      const resultRes = await fetch(resultUrl, { method: 'GET', cache: 'no-store' });
       const text = await resultRes.text();
 
       if (text.includes('"msg":"process_completed"') || text.includes('"msg": "process_completed"')) {
         const lines = text.trim().split('\n');
         const lastJsonLine = [...lines].reverse().find((line) => line.startsWith('data: '));
         if (!lastJsonLine) {
-          return NextResponse.json(
-            { error: 'Could not parse completed response', raw: text },
-            { status: 500 }
-          );
+          return NextResponse.json({ error: 'Could not parse completed response', raw: text }, { status: 500 });
         }
-
         const parsed = JSON.parse(lastJsonLine.replace(/^data:\s*/, ''));
+        const normalized = normalizeRecommendations(parsed);
         return NextResponse.json({
           success: true,
-          data: { recommendations: parsed },
-          recommendations: parsed
+          source: 'ML API',
+          warnings: missing.length ? [`Profile is incomplete: missing ${missing.join(', ')}`] : [],
+          data: { recommendations: normalized, source: 'ML API', warnings: missing },
+          recommendations: normalized
         });
       }
     }
 
-    return NextResponse.json(
-      { error: 'ML request timed out' },
-      { status: 504 }
-    );
+    return NextResponse.json({ error: 'ML request timed out' }, { status: 504 });
   } catch (error) {
     console.error('Recommend route error:', error);
     return NextResponse.json(

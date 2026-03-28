@@ -9,9 +9,15 @@ export async function GET() {
   return handleApi(async () => {
     await dbConnect();
     const user = getUserFromCookie();
-    if (!user) throw new ApiError('Unauthorized', 401);
+    if (!user) {
+      console.error('AUTH /me: missing or invalid auth cookie');
+      throw new ApiError('Unauthorized', 401);
+    }
     const existingUser = await User.findById(user.userId).lean();
-    if (!existingUser) throw new ApiError('Unauthorized', 401);
+    if (!existingUser) {
+      console.error('AUTH /me: user not found for token payload', { userId: user.userId });
+      throw new ApiError('Unauthorized', 401);
+    }
     return ok(user);
   });
 }

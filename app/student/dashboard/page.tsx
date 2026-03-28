@@ -6,23 +6,32 @@ import Link from 'next/link';
 export default function StudentDashboard() {
   const [applications, setApplications] = useState<any[]>([]);
   const [recommendations, setRecommendations] = useState<any[]>([]);
+  const [profileCompletion, setProfileCompletion] = useState(0);
+  const [recommendSource, setRecommendSource] = useState('Loading...');
+  const [recommendWarning, setRecommendWarning] = useState('');
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     (async () => {
       try {
-        const [appRes, recRes] = await Promise.all([
+        const [appRes, recRes, profileRes] = await Promise.all([
           fetch('/api/applications'),
           fetch('/api/recommend', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ skills: ['React', 'TypeScript', 'UI'], experience: 'JUNIOR', top_n: 5 })
-          })
+            body: JSON.stringify({ top_n: 5 })
+          }),
+          fetch('/api/student/profile')
         ]);
         const appData = await appRes.json();
         const recData = await recRes.json();
+        const profileData = await profileRes.json();
         setApplications(appData?.data || []);
-        setRecommendations(recData?.data?.recommendations || []);
+        setRecommendations(recData?.data?.recommendations || recData?.recommendations || []);
+        setProfileCompletion(Number(profileData?.data?.completion || 0));
+        setRecommendSource(recData?.source || recData?.data?.source || 'ML API');
+        const warnings = recData?.warnings || recData?.data?.warnings || [];
+        setRecommendWarning(Array.isArray(warnings) && warnings.length ? String(warnings[0]) : '');
       } finally {
         setLoading(false);
       }
@@ -32,8 +41,6 @@ export default function StudentDashboard() {
   const sent = applications.length;
   const accepted = applications.filter((x) => x.status === 'ACCEPTED').length;
   const inProgress = applications.filter((x) => x.status === 'SENT').length;
-  const profileCompletion = 82;
-
   return (
     <div className="space-y-6 py-2">
       <section className="card p-7 md:p-10">
@@ -69,6 +76,8 @@ export default function StudentDashboard() {
             <h2 className="text-xl font-semibold text-slate-900">Recommended for you</h2>
             <Link href="/student/recommendations" className="text-sm font-semibold text-blue-700">See all</Link>
           </div>
+          <p className="mt-2 text-xs text-slate-500">Recommendation source: {recommendSource}</p>
+          {recommendWarning && <p className="mt-1 text-xs text-amber-700">{recommendWarning}</p>}
           {loading ? (
             <div className="mt-4 space-y-3">
               {Array.from({ length: 3 }).map((_, idx) => <div key={idx} className="h-20 animate-pulse rounded-2xl bg-slate-100" />)}
