@@ -69,18 +69,20 @@ export async function GET() {
     const user = requireAuth(['STUDENT', 'ADMIN']);
     await dbConnect();
 
-    const [profile, userDoc] = await Promise.all([
+    const [profileRaw, userRaw] = await Promise.all([
       StudentProfile.findOne({ userId: user.userId }).lean(),
-      User.findById(user.userId).lean()
+      User.findOne({ _id: user.userId }).lean()
     ]);
 
+    const profile = Array.isArray(profileRaw) ? profileRaw[0] : profileRaw;
+    const userDoc = Array.isArray(userRaw) ? userRaw[0] : userRaw;
     if (!userDoc) throw new ApiError('User not found', 404);
 
     const mergedProfile = {
       userId: user.userId,
-      university: profile?.university || userDoc.university || '',
-      city: profile?.city || userDoc.city || '',
-      bio: profile?.bio || userDoc.bio || '',
+      university: profile?.university || userDoc?.university || '',
+      city: profile?.city || userDoc?.city || '',
+      bio: profile?.bio || userDoc?.bio || '',
       about: profile?.about || '',
       skills: profile?.skills || [],
       interests: profile?.interests || [],
@@ -90,7 +92,7 @@ export async function GET() {
       linkedinUrl: profile?.linkedinUrl || '',
       experienceLevel: profile?.experienceLevel || 'JUNIOR',
       availabilityStatus: profile?.availabilityStatus || 'AVAILABLE',
-      fullName: userDoc.fullName || ''
+      fullName: userDoc?.fullName || ''
     };
 
     return ok({ ...mergedProfile, completion: calculateCompletion(mergedProfile) });
@@ -103,9 +105,9 @@ export async function PUT(req: Request) {
     await dbConnect();
     const payload = schema.parse(await req.json());
 
-    const [userDoc, profile] = await Promise.all([
-      User.findByIdAndUpdate(
-        user.userId,
+    const [userRaw, profileRaw] = await Promise.all([
+      User.findOneAndUpdate(
+        { _id: user.userId },
         { university: payload.university || '', city: payload.city || '', bio: payload.bio || '' },
         { new: true }
       ),
@@ -131,6 +133,8 @@ export async function PUT(req: Request) {
       )
     ]);
 
+    const userDoc = Array.isArray(userRaw) ? userRaw[0] : userRaw;
+    const profile = Array.isArray(profileRaw) ? profileRaw[0] : profileRaw;
     if (!profile || !userDoc) {
       console.error('PROFILE SAVE ERROR: profile or user missing after update', { userId: user.userId });
       throw new ApiError('Failed to persist student profile', 500);
