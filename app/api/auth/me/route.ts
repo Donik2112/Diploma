@@ -17,7 +17,6 @@ export async function GET() {
       role: user.role,
       fullName: userDoc.fullName,
       email: userDoc.email,
-      emailVerified: userDoc.emailVerified,
       approvalStatus: userDoc.approvalStatus || 'APPROVED',
       rejectionReason: userDoc.rejectionReason || null
     });

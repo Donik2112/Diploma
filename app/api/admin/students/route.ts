@@ -17,7 +17,7 @@ export async function GET() {
     requireAuth(['ADMIN']);
     await dbConnect();
     const rows = await User.find({ role: 'STUDENT', approvalStatus: 'PENDING' })
-      .select('fullName email university emailVerified approvalStatus createdAt')
+      .select('fullName email university approvalStatus createdAt')
       .sort({ createdAt: 1 })
       .lean();
     return NextResponse.json({ success: true, data: rows });

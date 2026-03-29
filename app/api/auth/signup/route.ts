@@ -1,5 +1,4 @@
 import bcrypt from 'bcryptjs';
-import { createHash, randomBytes } from 'crypto';
 import { z } from 'zod';
 import { NextResponse } from 'next/server';
 import { dbConnect } from '@/lib/mongodb';
@@ -7,49 +6,18 @@ import User from '@/models/User';
 import StudentProfile from '@/models/StudentProfile';
 import ClientProfile from '@/models/ClientProfile';
 import { KAZAKHSTAN_UNIVERSITIES } from '@/lib/kazakhstanUniversities';
-import { sendVerificationEmail } from '@/lib/email';
 
 export const dynamic = 'force-dynamic';
 
 const schema = z.object({
-  firstName: z.string({ required_error: 'Enter your first name' }).trim()
-    .min(1, 'Enter your first name')
-    .min(2, 'First name must be at least 2 characters long')
-    .max(60),
-  lastName: z.string({ required_error: 'Enter your last name' }).trim()
-    .min(1, 'Enter your last name')
-    .min(2, 'Last name must be at least 2 characters long')
-    .max(60),
-  email: z.string({ required_error: 'Enter your email' }).trim()
-    .min(1, 'Enter your email')
-    .email('Enter a valid email address'),
-  password: z.string({ required_error: 'Enter a password' })
-    .min(1, 'Enter a password')
-    .min(8, 'Password must be at least 8 characters long')
-    .regex(/[A-Za-z]/, 'Password must contain at least one letter')
-    .regex(/\d/, 'Password must contain at least one number')
-    .max(128),
-  role: z.enum(['STUDENT', 'CLIENT'], {
-    required_error: 'Select a role',
-    invalid_type_error: 'Select a role'
-  }),
-  university: z.string({ required_error: 'Select your university' }).trim()
-    .min(1, 'Select your university')
-    .refine((v) => (KAZAKHSTAN_UNIVERSITIES as readonly string[]).includes(v), 'Select your university'),
-  captchaToken: z.string({ required_error: 'Please complete the CAPTCHA' })
-    .min(1, 'Please complete the CAPTCHA')
+  firstName: z.string({ required_error: 'Enter your first name' }).trim().min(2).max(60),
+  lastName: z.string({ required_error: 'Enter your last name' }).trim().min(2).max(60),
+  email: z.string({ required_error: 'Enter your email' }).trim().email('Enter a valid email address'),
+  password: z.string({ required_error: 'Enter a password' }).min(8).regex(/[A-Za-z]/).regex(/\d/).max(128),
+  role: z.enum(['STUDENT', 'CLIENT'], { required_error: 'Select a role' }),
+  university: z.string({ required_error: 'Select your university' }).trim().refine((v) => (KAZAKHSTAN_UNIVERSITIES as readonly string[]).includes(v), 'Select your university'),
+  captchaToken: z.string({ required_error: 'Please complete the CAPTCHA' }).min(1, 'Please complete the CAPTCHA')
 });
-
-function hashToken(token: string) {
-  return createHash('sha256').update(token).digest('hex');
-}
-
-function createVerificationToken() {
-  const rawToken = randomBytes(32).toString('hex');
-  const tokenHash = hashToken(rawToken);
-  const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
-  return { rawToken, tokenHash, expiresAt };
-}
 
 async function verifyCaptcha(token: string, ip?: string | null) {
   const secret = process.env.TURNSTILE_SECRET_KEY;
@@ -74,7 +42,6 @@ async function verifyCaptcha(token: string, ip?: string | null) {
 }
 
 export async function POST(req: Request) {
-  let requestEmail = '';
   try {
     await dbConnect();
     const parsed = schema.safeParse(await req.json());
@@ -85,8 +52,8 @@ export async function POST(req: Request) {
         { status: 400 }
       );
     }
+
     const body = parsed.data;
-    requestEmail = body.email;
     const fullName = `${body.firstName} ${body.lastName}`.trim();
     const isCaptchaValid = await verifyCaptcha(body.captchaToken, req.headers.get('x-forwarded-for'));
     if (!isCaptchaValid) {
@@ -98,18 +65,6 @@ export async function POST(req: Request) {
 
     const existingUser: any = await User.findOne({ email: body.email });
     if (existingUser) {
-      if (!existingUser.emailVerified) {
-        return NextResponse.json(
-          {
-            success: false,
-            error: 'An account with this email already exists but is not verified yet.',
-            field: 'email',
-            canResendVerification: true
-          },
-          { status: 409 }
-        );
-      }
-
       return NextResponse.json(
         { success: false, error: 'A user with this email already exists', field: 'email' },
         { status: 409 }
@@ -117,17 +72,13 @@ export async function POST(req: Request) {
     }
 
     const passwordHash = await bcrypt.hash(body.password, 10);
-    const { rawToken, tokenHash, expiresAt } = createVerificationToken();
     const user = await User.create({
       fullName,
       email: body.email,
       role: body.role,
       approvalStatus: body.role === 'STUDENT' ? 'PENDING' : 'APPROVED',
       passwordHash,
-      university: body.university,
-      emailVerified: false,
-      emailVerificationToken: tokenHash,
-      emailVerificationExpiresAt: expiresAt
+      university: body.university
     });
 
     if (body.role === 'STUDENT') {
@@ -150,56 +101,17 @@ export async function POST(req: Request) {
       });
     }
 
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:8080';
-    const verifyUrl = `${appUrl}/verify-email?token=${rawToken}`;
-    let emailDeliveryFailed = false;
-    try {
-      await sendVerificationEmail(body.email, verifyUrl);
-    } catch (emailError) {
-      emailDeliveryFailed = true;
-      console.error('SIGNUP EMAIL SEND ERROR:', emailError);
-      console.log('EMAIL VERIFICATION FALLBACK URL:', verifyUrl);
-    }
-
-    const message = emailDeliveryFailed
-      ? 'Account created, but we could not send the verification email. Please try resending it.'
-      : 'Account created. Please check your email to verify your account.';
-    const verificationUrl = emailDeliveryFailed && process.env.NODE_ENV !== 'production'
-      ? verifyUrl
-      : undefined;
-
     return NextResponse.json(
       {
         success: true,
-        requiresEmailVerification: true,
-        emailDeliveryFailed,
-        message,
-        verificationUrl,
-        data: {
-          userId: user._id.toString(),
-          requiresEmailVerification: true,
-          emailDeliveryFailed,
-          verificationUrl
-        }
+        message: 'Account created. You can now sign in.',
+        data: { userId: user._id.toString() }
       },
       { status: 201 }
     );
   } catch (error: any) {
     console.error('SIGNUP ERROR:', error);
     if (error?.code === 11000) {
-      const duplicateUser: any = requestEmail ? await User.findOne({ email: requestEmail }) : null;
-      if (duplicateUser && !duplicateUser.emailVerified) {
-        return NextResponse.json(
-          {
-            success: false,
-            error: 'An account with this email already exists but is not verified yet.',
-            field: 'email',
-            canResendVerification: true
-          },
-          { status: 409 }
-        );
-      }
-
       return NextResponse.json(
         { success: false, error: 'A user with this email already exists', field: 'email' },
         { status: 409 }

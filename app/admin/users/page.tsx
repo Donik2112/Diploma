@@ -38,7 +38,6 @@ export default function AdminUsersPage() {
             <p className="font-semibold">{row.fullName}</p>
             <p className="text-sm text-slate-600">{row.email}</p>
             <p className="text-sm">University: {row.university || 'Not set'}</p>
-            <p className="text-sm">Email verified: {row.emailVerified ? 'Yes' : 'No'}</p>
             <div className="flex gap-2 mt-2">
               <button onClick={() => decide(row._id, 'APPROVE')} className="px-3 py-1 border rounded">Approve</button>
               <button onClick={() => decide(row._id, 'REJECT')} className="px-3 py-1 border rounded text-red-600">Reject</button>

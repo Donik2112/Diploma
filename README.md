@@ -121,10 +121,3 @@ If `/api/auth/signup` and `/api/projects` both return `500`, check Mongo runtime
 3. For Atlas, use:
    `mongodb+srv://madi:madi@cluster0.rnb3q.mongodb.net/Diploma?retryWrites=true&w=majority&appName=Cluster0`
 4. If using Docker + local Mongo, do not use `localhost`; use service name (for example `mongo`).
-
-## Email verification SMTP settings
-To send verification emails, configure:
-- `SMTP_USER`
-- `SMTP_PASS`
-- `SMTP_FROM`
-- `NEXT_PUBLIC_APP_URL`
