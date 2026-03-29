@@ -163,9 +163,12 @@ export default function StudentDashboard() {
                 <div key={rec.project_id || `${rec.title || 'project'}-${idx}`} className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
                   <div className="flex items-start justify-between gap-3">
                     <div>
-                      <p className="font-semibold text-slate-900">{rec.title || `Recommendation #${idx + 1}`}</p>
+                      <p className="font-semibold text-slate-900">{rec.title || rec.job_title || `Recommendation #${idx + 1}`}</p>
                       <p className="mt-1 text-sm text-slate-600">
                         {trimDescription(rec.match_reason || 'Match explanation is not available yet.', 120)}
+                      </p>
+                      <p className="mt-1 text-xs text-slate-500">
+                        {rec.city || 'Remote/Not specified'} · {rec.employment_type || 'Employment n/a'} · {rec.experience_level || 'Experience n/a'}
                       </p>
                       <div className="mt-2 flex flex-wrap items-center gap-2">
                         {rec.project_id ? (

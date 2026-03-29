@@ -53,7 +53,9 @@ export default function RecommendationsPage() {
     const arr = [...items];
     if (sort === 'title') {
       arr.sort((a, b) =>
-        String(a.title || '').localeCompare(String(b.title || ''))
+        String(a.title || a.job_title || '').localeCompare(
+          String(b.title || b.job_title || '')
+        )
       );
     } else {
       arr.sort((a, b) => Number(b.final_score || 0) - Number(a.final_score || 0));
@@ -142,7 +144,7 @@ export default function RecommendationsPage() {
       {profileReadiness.recommendationMode !== 'blocked' && rendered.map((i, idx) => (
         <div key={i.project_id || `${i.title || 'project'}-${idx}`} className="card p-4">
           <div className="flex justify-between gap-3">
-            <h3 className="font-semibold">{i.title || `Recommendation #${idx + 1}`}</h3>
+            <h3 className="font-semibold">{i.title || i.job_title || `Recommendation #${idx + 1}`}</h3>
             {showPercent ? (
               <span className="text-brand font-semibold">
                 {scoreToPercent(Number(i.final_score), minScore, maxScore)}% match
@@ -165,6 +167,14 @@ export default function RecommendationsPage() {
             <p>Employment: {i.employment_type || 'Not specified'}</p>
             <p>Experience: {i.experience_level || 'Not specified'}</p>
             <p>Salary: {i.salary || 'Not specified'}</p>
+          </div>
+          <div className="mt-1 grid gap-1 text-xs text-slate-500 md:grid-cols-2">
+            <p>Category: {i.category || 'Not specified'}</p>
+            <p>
+              Budget: {Number.isFinite(Number(i.budget_min)) || Number.isFinite(Number(i.budget_max))
+                ? `${i.budget_min ?? 0} - ${i.budget_max ?? 0}`
+                : 'Not specified'}
+            </p>
           </div>
           <p className="mt-2 text-xs text-slate-500">
             Family: <span className="font-medium text-slate-700">{i.predicted_family || 'Not specified'}</span>

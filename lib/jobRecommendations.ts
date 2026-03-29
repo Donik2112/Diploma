@@ -1,16 +1,21 @@
 export type JobRecommendation = {
   project_id?: string;
+  job_title?: string;
   title?: string;
   skills?: string;
   text?: string;
   experience_level?: string;
   employment_type?: string;
   city?: string;
+  category?: string;
+  budget_min?: number;
+  budget_max?: number;
   salary?: string;
   job_family?: string;
   candidate_similarity?: number;
   rank_score?: number;
   final_score?: number;
+  final_score_percent?: number;
   match_reason?: string;
   predicted_family?: string;
 };

@@ -40,6 +40,9 @@ function toProjectText(project: any) {
     experience_level: String(project?.experienceLevel || ''),
     employment_type: String(project?.employmentType || ''),
     city: String(project?.city || ''),
+    category: String(project?.category || ''),
+    budget_min: Number(project?.budgetMin ?? 0),
+    budget_max: Number(project?.budgetMax ?? 0),
   };
 }
 
@@ -75,6 +78,9 @@ export async function POST(req: NextRequest) {
         city: 1,
         employmentType: 1,
         experienceLevel: 1,
+        category: 1,
+        budgetMin: 1,
+        budgetMax: 1,
       })
       .lean();
 
@@ -120,7 +126,7 @@ export async function POST(req: NextRequest) {
 
     let mlRes: Response;
     try {
-      mlRes = await fetch(`${ML_API_URL}/recommend`, {
+      mlRes = await fetch(`${ML_API_URL}/recommend-projects`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
