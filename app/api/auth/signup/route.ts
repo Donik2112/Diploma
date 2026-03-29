@@ -8,6 +8,7 @@ import StudentProfile from '@/models/StudentProfile';
 import ClientProfile from '@/models/ClientProfile';
 import { KAZAKHSTAN_UNIVERSITIES } from '@/lib/kazakhstanUniversities';
 import { sendVerificationEmail } from '@/lib/email';
+import { getAppUrl } from '@/lib/appUrl';
 
 export const dynamic = 'force-dynamic';
 
@@ -149,7 +150,7 @@ export async function POST(req: Request) {
       });
     }
 
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:8080';
+    const appUrl = getAppUrl();
     const verifyUrl = `${appUrl}/verify-email?token=${rawToken}`;
     let emailDeliveryFailed = false;
     try {
@@ -161,8 +162,8 @@ export async function POST(req: Request) {
     }
 
     const message = emailDeliveryFailed
-      ? 'Account created, but we could not send the verification email. Please try resending it.'
-      : 'Account created. Please check your email to verify your account.';
+      ? 'Account created. You can sign in now and resend verification from your account.'
+      : 'Account created. You can sign in now. Please verify your email from your account.';
     const verificationUrl = emailDeliveryFailed && process.env.NODE_ENV !== 'production'
       ? verifyUrl
       : undefined;
@@ -170,13 +171,11 @@ export async function POST(req: Request) {
     return NextResponse.json(
       {
         success: true,
-        requiresEmailVerification: true,
         emailDeliveryFailed,
         message,
         verificationUrl,
         data: {
           userId: user._id.toString(),
-          requiresEmailVerification: true,
           emailDeliveryFailed,
           verificationUrl
         }
