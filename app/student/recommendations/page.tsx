@@ -5,11 +5,22 @@ export default function RecommendationsPage() {
   const [items, setItems] = useState<any[]>([]);
   const [source, setSource] = useState('');
   const [sort, setSort] = useState<'match' | 'title'>('match');
+  const [blockedMessage, setBlockedMessage] = useState('');
 
   useEffect(() => {
-    fetch('/api/student/profile')
+    fetch('/api/auth/me')
       .then((r) => r.json())
+      .then((mePayload) => {
+        const status = mePayload?.data?.approvalStatus;
+        if (status && status !== 'APPROVED') {
+          setBlockedMessage(status === 'REJECTED' ? 'Your account was rejected by admin.' : 'Your account is under review by admin.');
+          return null;
+        }
+        return fetch('/api/student/profile');
+      })
+      .then((r) => (r ? r.json() : null))
       .then((profilePayload) => {
+        if (!profilePayload) return null;
         const profile = profilePayload?.data || {};
         return fetch('/api/recommend', {
           method: 'POST',
@@ -23,13 +34,18 @@ export default function RecommendationsPage() {
           })
         });
       })
-      .then((r) => r.json())
+      .then((r) => (r ? r.json() : null))
       .then((payload) => {
+        if (!payload) return;
         const data = payload?.data || payload;
         setItems(data.recommendations || []);
         setSource(data.source || 'fallback demo engine');
       });
   }, []);
+
+  if (blockedMessage) {
+    return <div className="card p-4">{blockedMessage}</div>;
+  }
 
   const rendered = useMemo(() => {
     const arr = [...items];

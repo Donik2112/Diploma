@@ -2,6 +2,10 @@ import { Schema, model, models } from 'mongoose';
 
 const UserSchema = new Schema({
   role: { type: String, enum: ['STUDENT', 'CLIENT', 'ADMIN'], required: true },
+  approvalStatus: { type: String, enum: ['PENDING', 'APPROVED', 'REJECTED'], default: 'APPROVED' },
+  approvedAt: Date,
+  approvedBy: String,
+  rejectionReason: String,
   fullName: String,
   email: { type: String, unique: true },
   emailVerified: { type: Boolean, default: false },

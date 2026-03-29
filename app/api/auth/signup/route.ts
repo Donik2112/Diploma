@@ -122,6 +122,7 @@ export async function POST(req: Request) {
       fullName,
       email: body.email,
       role: body.role,
+      approvalStatus: body.role === 'STUDENT' ? 'PENDING' : 'APPROVED',
       passwordHash,
       university: body.university,
       emailVerified: false,
