@@ -4,6 +4,7 @@ import User from '@/models/User';
 import { dbConnect } from '@/lib/mongodb';
 import { handleApi, ok, ApiError } from '@/lib/api';
 import { requireAuth } from '@/lib/auth';
+import { calculateProfileCompleteness } from '@/lib/profileCompleteness';
 
 export const dynamic = 'force-dynamic';
 
@@ -19,16 +20,29 @@ const schema = z.object({
   githubUrl: z.string().url().optional().or(z.literal('')),
   linkedinUrl: z.string().url().optional().or(z.literal('')),
   experienceLevel: z.string().max(40).optional(),
-  availabilityStatus: z.string().max(40).optional()
+  availabilityStatus: z.string().max(40).optional(),
+  onboardingCompleted: z.boolean().optional(),
+  preferredRoles: z.array(z.string()).optional(),
+  preferredEmploymentTypes: z.array(z.string()).optional()
 });
 
 export async function GET() {
   return handleApi(async () => {
     const user = requireAuth(['STUDENT', 'ADMIN']);
     await dbConnect();
-    const profile = await StudentProfile.findOne({ userId: user.userId }).lean();
+    const [profile, userDoc] = await Promise.all([
+      StudentProfile.findOne({ userId: user.userId }).lean(),
+      User.findById(user.userId).lean()
+    ]);
     if (!profile) throw new ApiError('Profile not found', 404);
-    return ok(profile);
+    const mergedProfile = {
+      ...profile,
+      university: (profile as any).university || (userDoc as any)?.university || '',
+      city: (profile as any).city || (userDoc as any)?.city || '',
+      bio: (profile as any).bio || (userDoc as any)?.bio || ''
+    };
+    const completeness = calculateProfileCompleteness(mergedProfile as any);
+    return ok({ ...mergedProfile, completeness });
   });
 }
 
@@ -42,7 +56,11 @@ export async function PUT(req: Request) {
       city: payload.city,
       bio: payload.bio
     });
-    const profile = await StudentProfile.findOneAndUpdate({ userId: user.userId }, payload, { new: true, upsert: true });
+    const profile = await StudentProfile.findOneAndUpdate(
+      { userId: user.userId },
+      payload,
+      { new: true, upsert: true }
+    );
     return ok(profile);
   });
 }

@@ -7,11 +7,22 @@ export default function RecommendationsPage() {
   const [sort, setSort] = useState<'match' | 'title'>('match');
 
   useEffect(() => {
-    fetch('/api/recommend', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ skills: ['Next.js', 'TypeScript', 'UI'], experience: 'JUNIOR', city: 'Almaty', top_n: 8 })
-    })
+    fetch('/api/student/profile')
+      .then((r) => r.json())
+      .then((profilePayload) => {
+        const profile = profilePayload?.data || {};
+        return fetch('/api/recommend', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            skills: profile.skills || [],
+            interests: profile.interests || [],
+            experience: profile.experienceLevel || 'JUNIOR',
+            city: profile.city || '',
+            top_n: 8
+          })
+        });
+      })
       .then((r) => r.json())
       .then((payload) => {
         const data = payload?.data || payload;
