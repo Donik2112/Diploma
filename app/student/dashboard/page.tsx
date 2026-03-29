@@ -1,34 +1,14 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-
-type JobRecommendation = {
-  id?: string;
-  job_title?: string;
-  match_reason?: string;
-  final_score?: number | string;
-};
-
-function scoreToMatchPercent(finalScore: unknown): number {
-  const score = Number(finalScore);
-  if (!Number.isFinite(score)) return 60;
-  if (score >= 5) return 95;
-  if (score >= 4) return 90;
-  if (score >= 3) return 85;
-  if (score >= 2) return 78;
-  if (score >= 1) return 70;
-  return 60;
-}
-
-function extractRecommendations(payload: any): JobRecommendation[] {
-  const rows =
-    payload?.data?.recommendations ??
-    payload?.recommendations ??
-    payload?.data ??
-    [];
-  return Array.isArray(rows) ? rows : [];
-}
+import {
+  extractRecommendations,
+  getScoreRange,
+  JobRecommendation,
+  scoreToPercent,
+  trimDescription,
+} from '@/lib/jobRecommendations';
 
 export default function StudentDashboard() {
   const [applications, setApplications] = useState<any[]>([]);
@@ -68,6 +48,10 @@ export default function StudentDashboard() {
   const sent = applications.length;
   const accepted = applications.filter((x) => x.status === 'ACCEPTED').length;
   const inProgress = applications.filter((x) => x.status === 'SENT').length;
+  const { minScore, maxScore } = useMemo(
+    () => getScoreRange(recommendations),
+    [recommendations]
+  );
   return (
     <div className="space-y-6 py-2">
       <section className="card p-7 md:p-10">
@@ -112,14 +96,43 @@ export default function StudentDashboard() {
           ) : recommendations.length ? (
             <div className="mt-4 space-y-3">
               {recommendations.slice(0, 4).map((rec: any, idx: number) => (
-                <div key={rec.id || `${rec.job_title || 'job'}-${idx}`} className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                <div key={rec.vacancy_id || `${rec.job_title || 'job'}-${idx}`} className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
                   <div className="flex items-start justify-between gap-3">
                     <div>
                       <p className="font-semibold text-slate-900">{rec.job_title || `Recommendation #${idx + 1}`}</p>
-                      <p className="mt-1 text-sm text-slate-600">{rec.match_reason || 'Match explanation is not available yet.'}</p>
+                      <p className="mt-1 text-sm text-slate-600">
+                        {trimDescription(rec.match_reason || 'Match explanation is not available yet.', 120)}
+                      </p>
+                      <div className="mt-2 flex flex-wrap items-center gap-2">
+                        {rec.vacancy_id ? (
+                          <Link
+                            href={`/projects/${encodeURIComponent(rec.vacancy_id)}`}
+                            className="rounded-md border border-slate-300 px-2.5 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-100"
+                          >
+                            View details
+                          </Link>
+                        ) : (
+                          <button
+                            type="button"
+                            disabled
+                            className="rounded-md border border-slate-200 px-2.5 py-1 text-xs font-semibold text-slate-400"
+                            title="Vacancy ID is not available for this recommendation."
+                          >
+                            View details
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          disabled
+                          className="rounded-md bg-slate-200 px-2.5 py-1 text-xs font-semibold text-slate-500"
+                          title="Application flow will be connected after vacancy-to-project mapping."
+                        >
+                          Apply now
+                        </button>
+                      </div>
                     </div>
                     <span className="status-pill bg-blue-100 text-blue-700">
-                      {scoreToMatchPercent(rec.final_score)}% match
+                      {scoreToPercent(Number(rec.final_score), minScore, maxScore)}% match
                     </span>
                   </div>
                 </div>

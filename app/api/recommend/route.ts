@@ -24,6 +24,14 @@ function getProfileCompletionHints(profile: any) {
   return missing;
 }
 
+function extractRecommendations(raw: any): any[] {
+  if (Array.isArray(raw?.recommendations)) return raw.recommendations;
+  if (Array.isArray(raw?.data?.recommendations)) return raw.data.recommendations;
+  if (Array.isArray(raw?.data)) return raw.data;
+  if (Array.isArray(raw)) return raw;
+  return [];
+}
+
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json().catch(() => ({}));
@@ -88,6 +96,8 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    const recommendations = extractRecommendations(mlData);
+
     return NextResponse.json({
       success: true,
       source: 'ML API',
@@ -95,6 +105,7 @@ export async function POST(req: NextRequest) {
         ? [`Profile is incomplete: missing ${missing.join(', ')}`]
         : [],
       data: mlData,
+      recommendations,
       ...mlData,
     });
   } catch (error: any) {

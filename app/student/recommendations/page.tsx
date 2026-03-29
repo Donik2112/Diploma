@@ -1,44 +1,14 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-
-type JobRecommendation = {
-  id?: string;
-  job_title?: string;
-  text?: string;
-  city?: string;
-  employment_type?: string;
-  experience_level?: string;
-  salary?: string;
-  job_family?: string;
-  match_reason?: string;
-  final_score?: number | string;
-};
-
-function scoreToMatchPercent(finalScore: unknown): number {
-  const score = Number(finalScore);
-  if (!Number.isFinite(score)) return 60;
-  if (score >= 5) return 95;
-  if (score >= 4) return 90;
-  if (score >= 3) return 85;
-  if (score >= 2) return 78;
-  if (score >= 1) return 70;
-  return 60;
-}
-
-function truncateText(text: string, maxLength: number) {
-  if (text.length <= maxLength) return text;
-  return `${text.slice(0, maxLength).trimEnd()}…`;
-}
-
-function extractRecommendations(payload: any): JobRecommendation[] {
-  const rows =
-    payload?.data?.recommendations ??
-    payload?.recommendations ??
-    payload?.data ??
-    [];
-  return Array.isArray(rows) ? rows : [];
-}
+import Link from 'next/link';
+import {
+  extractRecommendations,
+  getScoreRange,
+  JobRecommendation,
+  scoreToPercent,
+  trimDescription,
+} from '@/lib/jobRecommendations';
 
 export default function RecommendationsPage() {
   const [items, setItems] = useState<JobRecommendation[]>([]);
@@ -79,6 +49,7 @@ export default function RecommendationsPage() {
     }
     return arr;
   }, [items, sort]);
+  const { minScore, maxScore } = useMemo(() => getScoreRange(rendered), [rendered]);
 
   return (
     <div className="space-y-4">
@@ -103,15 +74,15 @@ export default function RecommendationsPage() {
       )}
 
       {rendered.map((i, idx) => (
-        <div key={i.id || `${i.job_title || 'job'}-${idx}`} className="card p-4">
+        <div key={i.vacancy_id || `${i.job_title || 'job'}-${idx}`} className="card p-4">
           <div className="flex justify-between gap-3">
             <h3 className="font-semibold">{i.job_title || `Recommendation #${idx + 1}`}</h3>
             <span className="text-brand font-semibold">
-              {scoreToMatchPercent(i.final_score)}% match
+              {scoreToPercent(Number(i.final_score), minScore, maxScore)}% match
             </span>
           </div>
           <p className="mt-1 text-sm text-slate-600">
-            {truncateText(i.text || 'No description provided.', 220)}
+            {trimDescription(i.text || 'No description provided.', 240)}
           </p>
           <div className="mt-2 grid gap-1 text-xs text-slate-500 md:grid-cols-4">
             <p>City: {i.city || 'Not specified'}</p>
@@ -123,7 +94,37 @@ export default function RecommendationsPage() {
             Family: <span className="font-medium text-slate-700">{i.job_family || 'Not specified'}</span>
           </p>
           <p className="mt-2 rounded bg-slate-50 p-2 text-xs text-slate-600">
-            {i.match_reason || 'Match explanation is not available yet.'}
+            {trimDescription(i.match_reason || 'Match explanation is not available yet.', 180)}
+          </p>
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            {i.vacancy_id ? (
+              <Link
+                href={`/projects/${encodeURIComponent(i.vacancy_id)}`}
+                className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100"
+              >
+                View details
+              </Link>
+            ) : (
+              <button
+                type="button"
+                disabled
+                className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-400"
+                title="Vacancy ID is not available for this recommendation."
+              >
+                View details
+              </button>
+            )}
+            <button
+              type="button"
+              disabled
+              className="rounded-lg bg-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-500"
+              title="Application flow will be connected after vacancy-to-project mapping."
+            >
+              Apply now
+            </button>
+          </div>
+          <p className="mt-2 text-xs text-slate-500">
+            Application flow will be connected next after mapping ML vacancy IDs to platform project records.
           </p>
         </div>
       ))}

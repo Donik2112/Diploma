@@ -1,0 +1,57 @@
+export type JobRecommendation = {
+  vacancy_id?: string;
+  job_title?: string;
+  skills?: string;
+  text?: string;
+  experience_level?: string;
+  employment_type?: string;
+  city?: string;
+  salary?: string;
+  job_family?: string;
+  candidate_similarity?: number;
+  rank_score?: number;
+  final_score?: number;
+  match_reason?: string;
+};
+
+export function extractRecommendations(payload: any): JobRecommendation[] {
+  const rows =
+    payload?.data?.recommendations ??
+    payload?.recommendations ??
+    payload?.data ??
+    [];
+  return Array.isArray(rows) ? rows : [];
+}
+
+export function getScoreRange(items: JobRecommendation[]) {
+  const scores = items
+    .map((item) => Number(item.final_score))
+    .filter((value) => Number.isFinite(value));
+
+  if (!scores.length) {
+    return { minScore: NaN, maxScore: NaN };
+  }
+
+  return {
+    minScore: Math.min(...scores),
+    maxScore: Math.max(...scores),
+  };
+}
+
+export function scoreToPercent(
+  score: number,
+  minScore: number,
+  maxScore: number
+): number {
+  if (!Number.isFinite(score)) return 70;
+  if (!Number.isFinite(minScore) || !Number.isFinite(maxScore)) return 70;
+  if (maxScore <= minScore) return 75;
+
+  const normalized = (score - minScore) / (maxScore - minScore);
+  return Math.round(65 + normalized * 30);
+}
+
+export function trimDescription(text: string, maxLength = 240) {
+  if (text.length <= maxLength) return text;
+  return `${text.slice(0, maxLength).trimEnd()}…`;
+}
