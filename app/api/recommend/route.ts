@@ -12,6 +12,8 @@ const schema = z.object({
   experience: z.string().default('JUNIOR'),
   city: z.string().optional(),
   interests: z.array(z.string()).optional(),
+  summary: z.string().optional(),
+  educationTrack: z.string().optional(),
   top_n: z.coerce.number().min(1).max(30).default(10),
   strict_city: z.boolean().optional()
 });
