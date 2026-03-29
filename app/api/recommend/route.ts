@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getUserFromCookie } from '@/lib/auth';
 import { dbConnect } from '@/lib/mongodb';
 import StudentProfile from '@/models/StudentProfile';
+import { getProfileReadiness } from '@/lib/profileReadiness';
 
 export const dynamic = 'force-dynamic';
 
@@ -16,12 +17,7 @@ function toStringList(value: unknown): string[] {
 }
 
 function getProfileCompletionHints(profile: any) {
-  const missing: string[] = [];
-  if (!profile?.skills?.length) missing.push('skills');
-  if (!profile?.city) missing.push('city');
-  if (!profile?.experienceLevel) missing.push('experienceLevel');
-  if (!profile?.interests?.length) missing.push('interests');
-  return missing;
+  return getProfileReadiness(profile).missingFields;
 }
 
 function extractRecommendations(raw: any): any[] {
@@ -63,7 +59,21 @@ export async function POST(req: NextRequest) {
       top_n: Number(body.top_n || 10),
     };
 
+    const profileReadiness = getProfileReadiness(profile);
     const missing = getProfileCompletionHints(profile);
+
+    if (authUser?.role === 'STUDENT' && profileReadiness.recommendationMode === 'blocked') {
+      return NextResponse.json({
+        success: true,
+        source: 'ML API',
+        warnings: [
+          'Complete your profile to get personalized recommendations.',
+        ],
+        profileReadiness,
+        data: { recommendations: [] },
+        recommendations: [],
+      });
+    }
 
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 20000);
@@ -106,6 +116,7 @@ export async function POST(req: NextRequest) {
         : [],
       data: mlData,
       recommendations,
+      profileReadiness,
       ...mlData,
     });
   } catch (error: any) {

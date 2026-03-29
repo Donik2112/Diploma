@@ -3,12 +3,14 @@
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import {
+  canRenderMatchPercent,
   extractRecommendations,
   getScoreRange,
   JobRecommendation,
   scoreToPercent,
   trimDescription,
 } from '@/lib/jobRecommendations';
+import { ProfileReadiness } from '@/lib/profileReadiness';
 
 export default function StudentDashboard() {
   const [applications, setApplications] = useState<any[]>([]);
@@ -16,6 +18,11 @@ export default function StudentDashboard() {
   const [profileCompletion, setProfileCompletion] = useState(0);
   const [recommendSource, setRecommendSource] = useState('Loading...');
   const [recommendWarning, setRecommendWarning] = useState('');
+  const [profileReadiness, setProfileReadiness] = useState<ProfileReadiness>({
+    completenessPercent: 0,
+    missingFields: [],
+    recommendationMode: 'ready',
+  });
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -35,6 +42,9 @@ export default function StudentDashboard() {
         const profileData = await profileRes.json();
         setApplications(appData?.data || []);
         setRecommendations(extractRecommendations(recData));
+        if (recData?.profileReadiness) {
+          setProfileReadiness(recData.profileReadiness);
+        }
         setProfileCompletion(Number(profileData?.data?.completion || 0));
         setRecommendSource(recData?.source || recData?.data?.source || 'ML API');
         const warnings = recData?.warnings || recData?.data?.warnings || [];
@@ -52,6 +62,9 @@ export default function StudentDashboard() {
     () => getScoreRange(recommendations),
     [recommendations]
   );
+  const showPercent =
+    profileReadiness.recommendationMode === 'ready' &&
+    canRenderMatchPercent(minScore, maxScore);
   return (
     <div className="space-y-6 py-2">
       <section className="card p-7 md:p-10">
@@ -88,10 +101,28 @@ export default function StudentDashboard() {
             <Link href="/student/recommendations" className="text-sm font-semibold text-blue-700">See all</Link>
           </div>
           <p className="mt-2 text-xs text-slate-500">Recommendation source: {recommendSource}</p>
+          {profileReadiness.recommendationMode === 'preliminary' && (
+            <p className="mt-1 text-xs text-blue-700">
+              Preliminary recommendations — complete your profile for higher-confidence ML matching.
+            </p>
+          )}
           {recommendWarning && <p className="mt-1 text-xs text-amber-700">{recommendWarning}</p>}
           {loading ? (
             <div className="mt-4 space-y-3">
               {Array.from({ length: 3 }).map((_, idx) => <div key={idx} className="h-20 animate-pulse rounded-2xl bg-slate-100" />)}
+            </div>
+          ) : profileReadiness.recommendationMode === 'blocked' ? (
+            <div className="mt-5 rounded-2xl border border-amber-300 bg-amber-50 p-6">
+              <p className="text-lg font-semibold text-slate-900">Your profile is incomplete</p>
+              <p className="mt-1 text-sm text-slate-700">
+                Add skills, interests, city and experience level to unlock personalized ML recommendations.
+              </p>
+              <p className="mt-2 text-xs text-slate-600">
+                Missing fields: {profileReadiness.missingFields.join(', ') || 'skills, interests, city, experienceLevel'}
+              </p>
+              <Link href="/student/profile" className="mt-4 inline-flex rounded-lg bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700">
+                Complete profile
+              </Link>
             </div>
           ) : recommendations.length ? (
             <div className="mt-4 space-y-3">
@@ -132,7 +163,9 @@ export default function StudentDashboard() {
                       </div>
                     </div>
                     <span className="status-pill bg-blue-100 text-blue-700">
-                      {scoreToPercent(Number(rec.final_score), minScore, maxScore)}% match
+                      {showPercent
+                        ? `${scoreToPercent(Number(rec.final_score), minScore, maxScore)}% match`
+                        : 'Low-confidence match'}
                     </span>
                   </div>
                 </div>

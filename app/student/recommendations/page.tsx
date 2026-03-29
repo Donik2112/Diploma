@@ -3,12 +3,14 @@
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import {
+  canRenderMatchPercent,
   extractRecommendations,
   getScoreRange,
   JobRecommendation,
   scoreToPercent,
   trimDescription,
 } from '@/lib/jobRecommendations';
+import { ProfileReadiness } from '@/lib/profileReadiness';
 
 export default function RecommendationsPage() {
   const [items, setItems] = useState<JobRecommendation[]>([]);
@@ -16,6 +18,11 @@ export default function RecommendationsPage() {
   const [warning, setWarning] = useState('');
   const [error, setError] = useState('');
   const [sort, setSort] = useState<'match' | 'title'>('match');
+  const [profileReadiness, setProfileReadiness] = useState<ProfileReadiness>({
+    completenessPercent: 0,
+    missingFields: [],
+    recommendationMode: 'ready',
+  });
 
   useEffect(() => {
     fetch('/api/recommend', {
@@ -28,6 +35,9 @@ export default function RecommendationsPage() {
         if (payload?.error) throw new Error(payload.error);
         setItems(extractRecommendations(payload));
         setSource(payload?.source || payload?.data?.source || 'ML API');
+        if (payload?.profileReadiness) {
+          setProfileReadiness(payload.profileReadiness);
+        }
         const warnings = payload?.warnings || payload?.data?.warnings || [];
         if (Array.isArray(warnings) && warnings.length) setWarning(String(warnings[0]));
       })
@@ -50,6 +60,9 @@ export default function RecommendationsPage() {
     return arr;
   }, [items, sort]);
   const { minScore, maxScore } = useMemo(() => getScoreRange(rendered), [rendered]);
+  const showPercent =
+    profileReadiness.recommendationMode === 'ready' &&
+    canRenderMatchPercent(minScore, maxScore);
 
   return (
     <div className="space-y-4">
@@ -62,10 +75,30 @@ export default function RecommendationsPage() {
       </div>
 
       <div className="card p-3 text-sm text-slate-600">Recommendation source: {source}</div>
+      {profileReadiness.recommendationMode === 'preliminary' && (
+        <div className="card p-3 text-sm text-blue-700">
+          Preliminary recommendations — finish your profile for higher-confidence ML matches.
+        </div>
+      )}
       {warning && <div className="card p-3 text-sm text-amber-700">{warning}</div>}
       {error && <div className="card p-3 text-sm text-red-600">{error}</div>}
 
-      {!error && rendered.length === 0 && (
+      {!error && profileReadiness.recommendationMode === 'blocked' && (
+        <div className="card p-6 text-center">
+          <p className="text-xl font-semibold text-slate-900">Complete your profile to get personalized recommendations</p>
+          <p className="mt-2 text-sm text-slate-600">
+            Missing fields: {profileReadiness.missingFields.join(', ') || 'skills, interests, city, experienceLevel'}
+          </p>
+          <Link
+            href="/student/profile"
+            className="mt-4 inline-flex rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700"
+          >
+            Complete profile
+          </Link>
+        </div>
+      )}
+
+      {!error && profileReadiness.recommendationMode !== 'blocked' && rendered.length === 0 && (
         <div className="card p-8 text-center">
           <p className="text-2xl">🧭</p>
           <h2 className="mt-2 text-lg font-semibold text-slate-900">No matching recommendations found</h2>
@@ -73,13 +106,23 @@ export default function RecommendationsPage() {
         </div>
       )}
 
-      {rendered.map((i, idx) => (
+      {profileReadiness.recommendationMode !== 'blocked' && rendered.map((i, idx) => (
         <div key={i.vacancy_id || `${i.job_title || 'job'}-${idx}`} className="card p-4">
           <div className="flex justify-between gap-3">
             <h3 className="font-semibold">{i.job_title || `Recommendation #${idx + 1}`}</h3>
-            <span className="text-brand font-semibold">
-              {scoreToPercent(Number(i.final_score), minScore, maxScore)}% match
-            </span>
+            {showPercent ? (
+              <span className="text-brand font-semibold">
+                {scoreToPercent(Number(i.final_score), minScore, maxScore)}% match
+              </span>
+            ) : (
+              <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-700">
+                {profileReadiness.recommendationMode === 'preliminary'
+                  ? 'Preliminary'
+                  : profileReadiness.recommendationMode === 'blocked'
+                    ? 'Profile incomplete'
+                    : 'Low-confidence match'}
+              </span>
+            )}
           </div>
           <p className="mt-1 text-sm text-slate-600">
             {trimDescription(i.text || 'No description provided.', 240)}

@@ -4,6 +4,7 @@ import User from '@/models/User';
 import { dbConnect } from '@/lib/mongodb';
 import { handleApi, ok, ApiError } from '@/lib/api';
 import { requireAuth } from '@/lib/auth';
+import { calculateProfileCompleteness, getProfileReadiness } from '@/lib/profileReadiness';
 
 export const dynamic = 'force-dynamic';
 
@@ -45,25 +46,6 @@ const schema = z.object({
   availabilityStatus: optionalString(40)
 });
 
-function calculateCompletion(profile: any) {
-  const checks = [
-    profile.university,
-    profile.city,
-    profile.bio,
-    profile.about,
-    profile.skills?.length ? 'ok' : '',
-    profile.interests?.length ? 'ok' : '',
-    profile.certificates?.length ? 'ok' : '',
-    profile.portfolioLinks?.length ? 'ok' : '',
-    profile.githubUrl,
-    profile.linkedinUrl,
-    profile.experienceLevel,
-    profile.availabilityStatus
-  ];
-  const filled = checks.filter((x) => String(x || '').trim()).length;
-  return Math.round((filled / checks.length) * 100);
-}
-
 export async function GET() {
   return handleApi(async () => {
     const user = requireAuth(['STUDENT', 'ADMIN']);
@@ -95,7 +77,12 @@ export async function GET() {
       fullName: userDoc?.fullName || ''
     };
 
-    return ok({ ...mergedProfile, completion: calculateCompletion(mergedProfile) });
+    const readiness = getProfileReadiness(mergedProfile);
+    return ok({
+      ...mergedProfile,
+      completion: calculateProfileCompleteness(mergedProfile),
+      profileReadiness: readiness,
+    });
   });
 }
 
@@ -143,7 +130,8 @@ export async function PUT(req: Request) {
     const mergedProfile = {
       ...profile.toObject(),
       fullName: userDoc.fullName || '',
-      completion: calculateCompletion(profile)
+      completion: calculateProfileCompleteness(profile),
+      profileReadiness: getProfileReadiness(profile),
     };
 
     return ok(mergedProfile);

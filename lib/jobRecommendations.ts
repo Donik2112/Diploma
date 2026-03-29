@@ -45,10 +45,14 @@ export function scoreToPercent(
 ): number {
   if (!Number.isFinite(score)) return 70;
   if (!Number.isFinite(minScore) || !Number.isFinite(maxScore)) return 70;
-  if (maxScore <= minScore) return 75;
+  if (maxScore <= minScore) return 70;
 
   const normalized = (score - minScore) / (maxScore - minScore);
   return Math.round(65 + normalized * 30);
+}
+
+export function canRenderMatchPercent(minScore: number, maxScore: number) {
+  return Number.isFinite(minScore) && Number.isFinite(maxScore) && maxScore > minScore;
 }
 
 export function trimDescription(text: string, maxLength = 240) {
