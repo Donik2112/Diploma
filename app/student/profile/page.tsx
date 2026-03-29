@@ -1,513 +1,421 @@
 'use client';
 
-import { ChangeEvent, DragEvent, KeyboardEvent, useEffect, useMemo, useState } from 'react';
+import { ChangeEvent, useEffect, useMemo, useState } from 'react';
 import { KAZAKHSTAN_UNIVERSITIES } from '@/lib/kazakhstanUniversities';
+
+type CertificateDoc = {
+  name: string;
+  issuer?: string;
+  issueDate?: string;
+  expirationDate?: string;
+  doesNotExpire?: boolean;
+  skillsCovered?: string[];
+  description?: string;
+  fileName: string;
+  fileSize?: number;
+  fileDataUrl?: string;
+};
+
+type DiplomaDoc = {
+  university: string;
+  degree?: string;
+  fieldOfStudy?: string;
+  gpa?: string;
+  startYear?: string;
+  graduationYear?: string;
+  graduated?: boolean;
+  expectedGraduationYear?: string;
+  notes?: string;
+  fileName: string;
+  fileSize?: number;
+  fileDataUrl?: string;
+};
 
 type ProfileData = {
   fullName?: string;
+  email?: string;
+  firstName?: string;
+  lastName?: string;
+  birthDate?: string;
+  phone?: string;
+  workplaceType?: string;
   university: string;
   city: string;
   bio: string;
   about: string;
+  headline?: string;
+  projects?: string;
+  languages?: string;
+  achievements?: string;
+  volunteering?: string;
+  preferredRoles?: string;
   skills: string[];
   interests: string[];
   certificates: string[];
+  certificateDocuments?: CertificateDoc[];
+  diplomaDocuments?: DiplomaDoc[];
   portfolioLinks: string[];
   githubUrl: string;
   linkedinUrl: string;
+  avatarDataUrl?: string;
   experienceLevel: string;
   availabilityStatus: string;
   completion: number;
   updatedAt?: string;
-  email?: string;
 };
 
-type UploadedDoc = {
-  id: string;
-  name: string;
-  size: number;
-  uploadedAt: string;
-  type: 'CERTIFICATE' | 'DIPLOMA';
-  file: File;
-};
+const CITIES = [
+  'Almaty', 'Astana', 'Shymkent', 'Karaganda', 'Aktobe', 'Taraz', 'Pavlodar', 'Ust-Kamenogorsk',
+  'Semey', 'Atyrau', 'Kostanay', 'Kyzylorda', 'Uralsk', 'Petropavlovsk', 'Aktau', 'Temirtau',
+  'Turkistan', 'Kokshetau', 'Taldykorgan', 'Ekibastuz', 'Rudny', 'Zhezkazgan'
+];
 
-const KAZAKHSTAN_CITIES = [
-  'Almaty', 'Astana', 'Shymkent', 'Karaganda', 'Aktobe', 'Taraz', 'Pavlodar',
-  'Ust-Kamenogorsk', 'Semey', 'Atyrau', 'Kostanay', 'Kyzylorda', 'Uralsk',
-  'Petropavlovsk', 'Aktau', 'Temirtau', 'Turkistan', 'Kokshetau', 'Taldykorgan',
-  'Ekibastuz', 'Rudny', 'Zhezkazgan'
-] as const;
-
-const SKILL_SUGGESTIONS = [
-  'Python', 'JavaScript', 'TypeScript', 'SQL', 'PostgreSQL', 'React', 'Next.js', 'Node.js',
-  'Flask', 'Django', 'FastAPI', 'Docker', 'Git', 'REST API', 'Telegram Bot API', 'Figma',
-  'UI/UX', 'Product Management', 'Data Analysis', 'Machine Learning', 'QA Testing', 'HTML',
-  'CSS', 'Tailwind', 'Java', 'C++', 'C#', 'PHP'
-] as const;
-
-const INTEREST_SUGGESTIONS = [
-  'Backend Development', 'Frontend Development', 'Data Science', 'Machine Learning',
-  'Product Management', 'Analytics', 'UI Design', 'DevOps', 'Cybersecurity', 'Mobile Development'
-] as const;
-
-const emptyProfile: ProfileData = {
-  fullName: '',
-  university: '',
-  city: '',
-  bio: '',
-  about: '',
-  skills: [],
-  interests: [],
-  certificates: [],
-  portfolioLinks: [],
-  githubUrl: '',
-  linkedinUrl: '',
-  experienceLevel: 'JUNIOR',
-  availabilityStatus: 'AVAILABLE',
-  completion: 0,
-  updatedAt: ''
-};
-
-function toCsv(arr: string[]) {
-  return arr.join(', ');
-}
+const SKILLS = ['Python','JavaScript','TypeScript','SQL','PostgreSQL','React','Next.js','Node.js','Flask','Django','FastAPI','Docker','Git','REST API','Telegram Bot API','Figma','UI/UX','Product Management','Data Analysis','Machine Learning','QA Testing','HTML','CSS','Tailwind','Java','C++','C#','PHP'];
+const INTERESTS = ['Data Science','Analytics','Recommendation Systems','Backend','Frontend','Mobile Development','Product Management','Research','Open Source'];
 
 function fromCsv(value: string) {
   return value.split(',').map((x) => x.trim()).filter(Boolean);
 }
 
-function computeCompletionLocal(profile: Record<string, any>) {
-  const checks = [
-    profile.fullName,
-    profile.university,
-    profile.city,
-    profile.phone,
-    profile.birthDate,
-    profile.bio,
-    profile.about,
-    profile.skills?.length ? 'ok' : '',
-    profile.interests?.length ? 'ok' : '',
-    profile.githubUrl,
-    profile.linkedinUrl,
-    profile.experienceLevel,
-    profile.availabilityStatus,
-    profile.workplaceType,
-    profile.headline,
-    profile.preferredRoles
-  ];
-  const filled = checks.filter((x) => String(x || '').trim()).length;
-  return Math.round((filled / checks.length) * 100);
+function toCsv(arr: string[] = []) {
+  return arr.join(', ');
 }
 
-function formatBytes(bytes: number) {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+async function toDataUrl(file: File) {
+  return await new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result || ''));
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
 }
 
-function TagInput({
-  label,
-  items,
-  onChange,
-  suggestions,
-  placeholder
-}: {
-  label: string;
-  items: string[];
-  onChange: (value: string[]) => void;
-  suggestions: readonly string[];
-  placeholder: string;
-}) {
-  const [query, setQuery] = useState('');
-
-  const filtered = useMemo(
-    () => suggestions.filter((x) => x.toLowerCase().includes(query.toLowerCase()) && !items.includes(x)).slice(0, 6),
-    [query, suggestions, items]
-  );
-
-  const add = (value: string) => {
-    const normalized = value.trim();
-    if (!normalized) return;
-    if (items.some((item) => item.toLowerCase() === normalized.toLowerCase())) return;
-    onChange([...items, normalized]);
-    setQuery('');
-  };
-
+function LabeledField({ label, children, helper }: { label: string; children: React.ReactNode; helper?: string }) {
   return (
-    <div className="space-y-2">
+    <div className="space-y-1.5">
       <label className="text-sm font-medium text-slate-700">{label}</label>
-      <div className="rounded-xl border border-slate-200 bg-white p-2">
-        <div className="flex flex-wrap gap-2">
-          {items.map((item) => (
-            <span key={item} className="inline-flex items-center gap-2 rounded-full bg-blue-50 px-3 py-1 text-xs font-medium text-blue-700">
-              {item}
-              <button type="button" onClick={() => onChange(items.filter((x) => x !== item))} className="text-blue-500 hover:text-blue-700">×</button>
-            </span>
-          ))}
-        </div>
-        <div className="mt-2 flex gap-2">
-          <input
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            onKeyDown={(e: KeyboardEvent<HTMLInputElement>) => {
-              if (e.key === 'Enter') {
-                e.preventDefault();
-                add(query);
-              }
-            }}
-            className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
-            placeholder={placeholder}
-          />
-          <button type="button" onClick={() => add(query)} className="rounded-lg border border-slate-200 px-3 text-sm hover:bg-slate-50">+</button>
-        </div>
-        {!!filtered.length && (
-          <div className="mt-2 flex flex-wrap gap-2">
-            {filtered.map((item) => (
-              <button type="button" key={item} onClick={() => add(item)} className="rounded-full border border-slate-200 px-3 py-1 text-xs text-slate-600 hover:bg-slate-50">
-                {item}
-              </button>
-            ))}
-          </div>
-        )}
-      </div>
+      {children}
+      {helper ? <p className="text-xs text-slate-500">{helper}</p> : null}
     </div>
   );
 }
 
+function EmptyState({ text }: { text: string }) {
+  return <p className="rounded-xl bg-slate-50 p-3 text-sm text-slate-500">{text}</p>;
+}
+
 export default function StudentProfilePage() {
-  const [profile, setProfile] = useState<ProfileData>(emptyProfile);
-  const [editMode, setEditMode] = useState(true);
+  const [profile, setProfile] = useState<ProfileData | null>(null);
+  const [edit, setEdit] = useState(true);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
-  const [message, setMessage] = useState('');
-  const [docs, setDocs] = useState<UploadedDoc[]>([]);
+  const [ok, setOk] = useState('');
 
-  const [form, setForm] = useState({
-    fullName: '',
-    lastName: '',
-    birthDate: '',
-    phone: '',
-    email: '',
-    country: 'Kazakhstan',
-    phonePrivacy: 'PUBLIC',
-    birthDatePrivacy: 'PRIVATE',
-    university: '',
-    city: '',
-    workplaceType: 'REMOTE',
-    bio: '',
-    about: '',
-    headline: '',
-    experience: '',
-    projects: '',
-    languages: '',
-    achievements: '',
-    volunteering: '',
-    preferredRoles: '',
-    skills: [] as string[],
-    interests: [] as string[],
-    certificates: [] as string[],
-    portfolioLinks: '' as string,
-    githubUrl: '',
-    linkedinUrl: '',
-    experienceLevel: 'JUNIOR',
-    availabilityStatus: 'AVAILABLE'
+  const [form, setForm] = useState<any>({
+    firstName: '', lastName: '', birthDate: '', phone: '', email: '', country: 'Kazakhstan',
+    phonePrivacy: 'PUBLIC', birthDatePrivacy: 'PRIVATE',
+    university: '', city: '', workplaceType: 'REMOTE',
+    headline: '', preferredRoles: '', about: '', bio: '', experience: '', projects: '', languages: '', achievements: '', volunteering: '',
+    skills: [] as string[], interests: [] as string[],
+    githubUrl: '', linkedinUrl: '', portfolioLinks: '',
+    experienceLevel: 'JUNIOR', availabilityStatus: 'AVAILABLE',
+    avatarDataUrl: '',
+    certificateDocuments: [] as CertificateDoc[],
+    diplomaDocuments: [] as DiplomaDoc[]
   });
+
+  const [newCertificate, setNewCertificate] = useState<CertificateDoc>({ name: '', fileName: '' });
+  const [newDiploma, setNewDiploma] = useState<DiplomaDoc>({ university: '', fileName: '', graduated: true });
 
   useEffect(() => {
     (async () => {
-      setLoading(true);
-      setError('');
       try {
         const res = await fetch('/api/student/profile');
         const payload = await res.json();
-        if (!res.ok || !payload?.success) {
-          throw new Error(payload?.error?.message || payload?.error || 'Could not load profile');
-        }
-        const data = payload.data as ProfileData;
-        setProfile(data);
-        const [firstName, ...rest] = String(data.fullName || '').split(' ');
-        setForm((prev) => ({
-          ...prev,
-          fullName: firstName || '',
-          lastName: rest.join(' '),
-          email: data.email || '',
-          university: data.university || '',
-          city: data.city || '',
-          bio: data.bio || '',
-          about: data.about || '',
-          skills: data.skills || [],
-          interests: data.interests || [],
-          certificates: data.certificates || [],
-          portfolioLinks: toCsv(data.portfolioLinks || []),
-          githubUrl: data.githubUrl || '',
-          linkedinUrl: data.linkedinUrl || '',
-          experienceLevel: data.experienceLevel || 'JUNIOR',
-          availabilityStatus: data.availabilityStatus || 'AVAILABLE'
+        if (!res.ok || !payload?.success) throw new Error(payload?.error || 'Failed to load profile');
+        const p: ProfileData = payload.data;
+        setProfile(p);
+        setForm((f: any) => ({
+          ...f,
+          firstName: p.firstName || p.fullName?.split(' ')[0] || '',
+          lastName: p.lastName || p.fullName?.split(' ').slice(1).join(' ') || '',
+          email: p.email || '',
+          birthDate: p.birthDate || '',
+          phone: p.phone || '',
+          workplaceType: p.workplaceType || 'REMOTE',
+          university: p.university || '',
+          city: p.city || '',
+          headline: p.headline || '',
+          preferredRoles: p.preferredRoles || '',
+          about: p.about || '',
+          bio: p.bio || '',
+          experience: p.experience || '',
+          projects: p.projects || '',
+          languages: p.languages || '',
+          achievements: p.achievements || '',
+          volunteering: p.volunteering || '',
+          skills: p.skills || [],
+          interests: p.interests || [],
+          githubUrl: p.githubUrl || '',
+          linkedinUrl: p.linkedinUrl || '',
+          portfolioLinks: toCsv(p.portfolioLinks),
+          experienceLevel: p.experienceLevel || 'JUNIOR',
+          availabilityStatus: p.availabilityStatus || 'AVAILABLE',
+          avatarDataUrl: p.avatarDataUrl || '',
+          certificateDocuments: p.certificateDocuments || [],
+          diplomaDocuments: p.diplomaDocuments || []
         }));
-        setEditMode(false);
-      } catch (err: any) {
-        setError(err?.message || 'Could not load profile');
-        setEditMode(true);
+        setEdit(false);
+      } catch (e: any) {
+        setError(e?.message || 'Failed to load profile');
       } finally {
         setLoading(false);
       }
     })();
   }, []);
 
-  const filteredUniversities = useMemo(() => {
-    if (!form.university) return KAZAKHSTAN_UNIVERSITIES.slice(0, 8);
-    return KAZAKHSTAN_UNIVERSITIES.filter((u) => u.toLowerCase().includes(form.university.toLowerCase())).slice(0, 8);
-  }, [form.university]);
+  const completion = useMemo(() => {
+    const checks = [form.firstName, form.lastName, form.university, form.city, form.headline, form.about, form.skills.length, form.interests.length, form.portfolioLinks, form.githubUrl, form.linkedinUrl, form.experienceLevel, form.availabilityStatus];
+    return Math.round((checks.filter(Boolean).length / checks.length) * 100);
+  }, [form]);
 
-  const filteredCities = useMemo(() => {
-    if (!form.city) return KAZAKHSTAN_CITIES;
-    return KAZAKHSTAN_CITIES.filter((c) => c.toLowerCase().includes(form.city.toLowerCase()));
-  }, [form.city]);
-
-  const localCompletion = useMemo(() => computeCompletionLocal(form), [form]);
-
-  async function submit(e: React.FormEvent) {
+  const save = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
-    setMessage('');
-
-    if (!form.university || !form.city || !form.skills.length || !form.interests.length) {
-      setError('Please fill required fields: university, city, skills, and interests.');
-      return;
-    }
-
+    setOk('');
     setSaving(true);
     try {
-      const res = await fetch('/api/student/profile', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          university: form.university,
-          city: form.city,
-          bio: form.bio,
-          about: form.about,
-          skills: form.skills,
-          interests: form.interests,
-          certificates: [...form.certificates, ...docs.map((d) => `${d.type}:${d.name}`)],
-          portfolioLinks: fromCsv(form.portfolioLinks),
-          githubUrl: form.githubUrl,
-          linkedinUrl: form.linkedinUrl,
-          experienceLevel: form.experienceLevel,
-          availabilityStatus: form.availabilityStatus
-        })
-      });
-      const payload = await res.json();
-      if (!res.ok || !payload?.success) {
-        throw new Error(payload?.error?.message || payload?.error || 'Failed to save profile');
-      }
-      setProfile(payload.data as ProfileData);
-      setMessage('Profile updated successfully.');
-      setEditMode(false);
-    } catch (err: any) {
-      setError(err?.message || 'Failed to save profile');
+      const payload = {
+        firstName: form.firstName,
+        lastName: form.lastName,
+        birthDate: form.birthDate,
+        phone: form.phone,
+        workplaceType: form.workplaceType,
+        university: form.university,
+        city: form.city,
+        bio: form.bio,
+        about: form.about,
+        headline: form.headline,
+        projects: form.projects,
+        languages: form.languages,
+        achievements: form.achievements,
+        volunteering: form.volunteering,
+        preferredRoles: form.preferredRoles,
+        skills: form.skills,
+        interests: form.interests,
+        certificates: form.certificateDocuments.map((x: CertificateDoc) => x.name),
+        certificateDocuments: form.certificateDocuments,
+        diplomaDocuments: form.diplomaDocuments,
+        portfolioLinks: fromCsv(form.portfolioLinks),
+        githubUrl: form.githubUrl,
+        linkedinUrl: form.linkedinUrl,
+        avatarDataUrl: form.avatarDataUrl,
+        experienceLevel: form.experienceLevel,
+        availabilityStatus: form.availabilityStatus
+      };
+      const res = await fetch('/api/student/profile', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+      const data = await res.json();
+      if (!res.ok || !data?.success) throw new Error(data?.error || 'Failed to save profile');
+      setProfile(data.data);
+      setOk('Profile saved successfully.');
+      setEdit(false);
+    } catch (e: any) {
+      setError(e?.message || 'Failed to save profile');
     } finally {
       setSaving(false);
     }
-  }
-
-  const handlePdfUpload = (files: FileList | null, type: UploadedDoc['type']) => {
-    if (!files?.length) return;
-    const file = files[0];
-    if (file.type !== 'application/pdf') {
-      setError('Only PDF files are allowed.');
-      return;
-    }
-    if (file.size > 10 * 1024 * 1024) {
-      setError('PDF size must be up to 10 MB.');
-      return;
-    }
-    setDocs((prev) => [...prev, {
-      id: `${Date.now()}-${file.name}`,
-      name: file.name,
-      size: file.size,
-      uploadedAt: new Date().toISOString(),
-      type,
-      file
-    }]);
   };
 
-  const onDrop = (e: DragEvent<HTMLDivElement>, type: UploadedDoc['type']) => {
-    e.preventDefault();
-    handlePdfUpload(e.dataTransfer.files, type);
+  const addSkill = (value: string, key: 'skills' | 'interests') => {
+    const v = value.trim();
+    if (!v) return;
+    if (form[key].some((x: string) => x.toLowerCase() === v.toLowerCase())) return;
+    setForm({ ...form, [key]: [...form[key], v] });
   };
 
-  if (loading) {
-    return <div className="card p-8">Loading profile workspace...</div>;
-  }
+  const uploadAvatar = async (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith('image/')) return setError('Avatar must be an image file.');
+    setForm({ ...form, avatarDataUrl: await toDataUrl(file) });
+  };
+
+  const uploadCertificateFile = async (file?: File) => {
+    if (!file) return;
+    if (file.type !== 'application/pdf') return setError('Certificate file must be PDF.');
+    if (file.size > 10 * 1024 * 1024) return setError('Certificate PDF must be <= 10 MB.');
+    setNewCertificate({ ...newCertificate, fileName: file.name, fileSize: file.size, fileDataUrl: await toDataUrl(file) });
+  };
+
+  const uploadDiplomaFile = async (file?: File) => {
+    if (!file) return;
+    if (file.type !== 'application/pdf') return setError('Diploma file must be PDF.');
+    if (file.size > 10 * 1024 * 1024) return setError('Diploma PDF must be <= 10 MB.');
+    setNewDiploma({ ...newDiploma, fileName: file.name, fileSize: file.size, fileDataUrl: await toDataUrl(file) });
+  };
+
+  if (loading) return <div className="card p-8">Loading profile...</div>;
 
   return (
     <div className="space-y-6 py-2">
-      {(error || message) && <div className={`card p-4 text-sm ${error ? 'text-red-600' : 'text-emerald-700'}`}>{error || message}</div>}
+      {(error || ok) && <div className={`card p-4 text-sm ${error ? 'text-red-600' : 'text-emerald-700'}`}>{error || ok}</div>}
 
       <section className="card overflow-hidden p-0">
-        <div className="h-24 bg-gradient-to-r from-blue-600 via-indigo-500 to-cyan-500" />
-        <div className="flex flex-wrap items-end justify-between gap-4 px-6 pb-6 -mt-8">
+        <div className="h-28 bg-gradient-to-r from-indigo-600 to-cyan-500" />
+        <div className="-mt-10 flex flex-wrap items-end justify-between gap-4 px-6 pb-6">
           <div className="flex items-end gap-4">
-            <div className="h-20 w-20 rounded-2xl border-4 border-white bg-white shadow-md flex items-center justify-center text-xl font-bold text-slate-700">
-              {String(form.fullName || profile.fullName || 'U').slice(0, 1)}
+            <div className="h-20 w-20 overflow-hidden rounded-2xl border-4 border-white bg-white shadow">
+              {form.avatarDataUrl ? <img src={form.avatarDataUrl} alt="avatar" className="h-full w-full object-cover" /> : <div className="flex h-full w-full items-center justify-center text-xl font-semibold text-slate-600">{(form.firstName || 'U')[0]}</div>}
             </div>
             <div>
-              <h1 className="section-title">{form.fullName || profile.fullName || 'Your profile'}</h1>
-              <p className="muted">{form.headline || 'Build a strong profile to unlock better project matches.'}</p>
-              <p className="mt-1 text-xs text-slate-500">Last updated: {profile.updatedAt ? new Date(profile.updatedAt).toLocaleString() : 'just now'}</p>
+              <h1 className="section-title">{`${form.firstName || ''} ${form.lastName || ''}`.trim() || 'Profile'}</h1>
+              <p className="muted">{form.headline || 'Add a headline to improve discoverability.'}</p>
+              <p className="text-xs text-slate-500">Profile completeness: {completion}%</p>
             </div>
           </div>
-          <div className="min-w-56 rounded-xl border border-slate-200 bg-white p-4">
-            <p className="text-xs uppercase tracking-wide text-slate-500">Profile completeness</p>
-            <p className="mt-1 text-2xl font-semibold text-slate-900">{localCompletion}%</p>
-            <div className="mt-2 h-2 rounded-full bg-slate-200">
-              <div className="h-2 rounded-full bg-blue-600" style={{ width: `${localCompletion}%` }} />
-            </div>
+          <div className="flex gap-2">
+            {edit ? (
+              <button type="button" onClick={() => setEdit(false)} className="btn-secondary">Preview profile</button>
+            ) : (
+              <button type="button" onClick={() => setEdit(true)} className="btn-secondary">Edit profile</button>
+            )}
           </div>
         </div>
       </section>
 
-      {!editMode ? (
-        <section className="card p-6">
-          <div className="flex justify-between">
-            <h2 className="text-lg font-semibold text-slate-900">Profile preview</h2>
-            <button type="button" onClick={() => setEditMode(true)} className="btn-secondary">Edit profile</button>
-          </div>
-          <p className="mt-3 text-sm text-slate-600">{profile.about || profile.bio || 'No summary yet.'}</p>
-        </section>
-      ) : (
-        <form onSubmit={submit} className="space-y-6">
-          <section className="card p-6 space-y-4">
-            <h2 className="text-lg font-semibold text-slate-900">Personal Information</h2>
+      {edit ? (
+        <form onSubmit={save} className="space-y-6">
+          <section className="card p-6">
+            <h2 className="mb-4 text-lg font-semibold">Personal Information</h2>
             <div className="grid gap-4 md:grid-cols-2">
-              <input value={form.fullName} onChange={(e) => setForm({ ...form, fullName: e.target.value })} className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm" placeholder="First name" />
-              <input value={form.lastName} onChange={(e) => setForm({ ...form, lastName: e.target.value })} className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm" placeholder="Last name" />
-              <input type="date" value={form.birthDate} onChange={(e) => setForm({ ...form, birthDate: e.target.value })} className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm" />
-              <input value={form.phone} onChange={(e: ChangeEvent<HTMLInputElement>) => setForm({ ...form, phone: e.target.value.replace(/[^\d+()\-\s]/g, '') })} className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm" placeholder="Phone number" />
-              <input value={form.email} readOnly className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm" placeholder="Email" />
-              <input value={form.country} readOnly className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm" />
+              <LabeledField label="First Name"><input className="rounded-xl border border-slate-200 px-3 py-2 text-sm" value={form.firstName} onChange={(e) => setForm({ ...form, firstName: e.target.value })} /></LabeledField>
+              <LabeledField label="Last Name"><input className="rounded-xl border border-slate-200 px-3 py-2 text-sm" value={form.lastName} onChange={(e) => setForm({ ...form, lastName: e.target.value })} /></LabeledField>
+              <LabeledField label="Date of Birth"><input type="date" className="rounded-xl border border-slate-200 px-3 py-2 text-sm" value={form.birthDate} onChange={(e) => setForm({ ...form, birthDate: e.target.value })} /></LabeledField>
+              <LabeledField label="Phone Number" helper="Only numeric symbols and +()- are allowed."><input className="rounded-xl border border-slate-200 px-3 py-2 text-sm" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value.replace(/[^\d+()\-\s]/g, '') })} /></LabeledField>
+              <LabeledField label="Email"><input readOnly className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm" value={form.email} /></LabeledField>
+              <LabeledField label="Country"><input readOnly className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm" value="Kazakhstan" /></LabeledField>
+              <LabeledField label="Phone Privacy"><select className="rounded-xl border border-slate-200 px-3 py-2 text-sm" value={form.phonePrivacy} onChange={(e)=>setForm({...form, phonePrivacy:e.target.value})}><option value="PUBLIC">Public</option><option value="PRIVATE">Private</option></select></LabeledField>
+              <LabeledField label="Birth Date Privacy"><select className="rounded-xl border border-slate-200 px-3 py-2 text-sm" value={form.birthDatePrivacy} onChange={(e)=>setForm({...form, birthDatePrivacy:e.target.value})}><option value="PRIVATE">Private</option><option value="PUBLIC">Public</option></select></LabeledField>
             </div>
-          </section>
-
-          <section className="card p-6 space-y-4">
-            <h2 className="text-lg font-semibold text-slate-900">Education</h2>
-            <div className="grid gap-4 md:grid-cols-2">
-              <div className="space-y-2">
-                <input value={form.university} onChange={(e) => setForm({ ...form, university: e.target.value })} className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm" placeholder="Search or type university" />
-                {!!filteredUniversities.length && (
-                  <div className="max-h-40 overflow-auto rounded-xl border border-slate-200 p-2">
-                    {filteredUniversities.map((u) => (
-                      <button key={u} type="button" onClick={() => setForm({ ...form, university: u })} className="block w-full rounded-lg px-2 py-1 text-left text-sm hover:bg-slate-50">{u}</button>
-                    ))}
-                  </div>
-                )}
-              </div>
-              <div className="space-y-2">
-                <input value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })} className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm" placeholder="Search city" />
-                {!!filteredCities.length && (
-                  <div className="max-h-40 overflow-auto rounded-xl border border-slate-200 p-2">
-                    {filteredCities.map((c) => (
-                      <button key={c} type="button" onClick={() => setForm({ ...form, city: c })} className="block w-full rounded-lg px-2 py-1 text-left text-sm hover:bg-slate-50">{c}</button>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
-          </section>
-
-          <section className="card p-6 space-y-4">
-            <h2 className="text-lg font-semibold text-slate-900">Skills</h2>
-            <div className="grid gap-4 lg:grid-cols-2">
-              <TagInput label="Skills" items={form.skills} onChange={(skills) => setForm({ ...form, skills })} suggestions={SKILL_SUGGESTIONS} placeholder="Type a skill and press Enter" />
-              <TagInput label="Interests" items={form.interests} onChange={(interests) => setForm({ ...form, interests })} suggestions={INTEREST_SUGGESTIONS} placeholder="Type an interest and press Enter" />
-            </div>
-          </section>
-
-          <section className="card p-6 space-y-4">
-            <h2 className="text-lg font-semibold text-slate-900">Certificates & Diplomas</h2>
-            <div className="grid gap-4 md:grid-cols-2">
-              {(['CERTIFICATE', 'DIPLOMA'] as const).map((docType) => (
-                <div key={docType} onDrop={(e) => onDrop(e, docType)} onDragOver={(e) => e.preventDefault()} className="rounded-xl border-2 border-dashed border-slate-300 p-4 text-center">
-                  <p className="text-sm font-medium text-slate-700">{docType === 'CERTIFICATE' ? 'Certificates' : 'Diplomas'}</p>
-                  <p className="mt-1 text-xs text-slate-500">Drop PDF here or use upload button</p>
-                  <label className="mt-3 inline-flex cursor-pointer rounded-lg border border-slate-200 px-3 py-2 text-sm hover:bg-slate-50">
-                    Upload PDF
-                    <input type="file" accept="application/pdf" className="hidden" onChange={(e) => handlePdfUpload(e.target.files, docType)} />
-                  </label>
+            <div className="mt-4">
+              <LabeledField label="Avatar Upload" helper="Upload image, preview, replace or remove.">
+                <div className="flex items-center gap-2">
+                  <input type="file" accept="image/*" onChange={uploadAvatar} />
+                  {form.avatarDataUrl && <button type="button" className="rounded-md border px-3 py-1 text-xs" onClick={() => setForm({ ...form, avatarDataUrl: '' })}>Remove</button>}
                 </div>
-              ))}
-            </div>
-            {!docs.length ? (
-              <div className="rounded-xl bg-slate-50 p-4 text-sm text-slate-500">No documents uploaded yet.</div>
-            ) : (
-              <div className="space-y-2">
-                {docs.map((doc) => (
-                  <div key={doc.id} className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 p-3">
-                    <div>
-                      <p className="text-sm font-medium text-slate-800">📄 {doc.name}</p>
-                      <p className="text-xs text-slate-500">{doc.type} · {formatBytes(doc.size)} · {new Date(doc.uploadedAt).toLocaleString()}</p>
-                    </div>
-                    <div className="flex gap-2">
-                      <button type="button" onClick={() => window.open(URL.createObjectURL(doc.file), '_blank')} className="rounded-md border border-slate-200 px-3 py-1 text-xs">Preview</button>
-                      <button type="button" onClick={() => {
-                        const a = document.createElement('a');
-                        a.href = URL.createObjectURL(doc.file);
-                        a.download = doc.name;
-                        a.click();
-                      }} className="rounded-md border border-slate-200 px-3 py-1 text-xs">Download</button>
-                      <button type="button" onClick={() => setDocs((prev) => prev.filter((x) => x.id !== doc.id))} className="rounded-md border border-red-200 px-3 py-1 text-xs text-red-600">Delete</button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </section>
-
-          <section className="card p-6 space-y-4">
-            <h2 className="text-lg font-semibold text-slate-900">Career Preferences</h2>
-            <div className="grid gap-4 md:grid-cols-3">
-              <select value={form.workplaceType} onChange={(e) => setForm({ ...form, workplaceType: e.target.value })} className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm">
-                <option value="REMOTE">Remote</option>
-                <option value="HYBRID">Hybrid</option>
-                <option value="OFFICE">Office</option>
-              </select>
-              <select value={form.experienceLevel} onChange={(e) => setForm({ ...form, experienceLevel: e.target.value })} className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm">
-                <option value="INTERN">Intern</option>
-                <option value="JUNIOR">Junior</option>
-                <option value="MIDDLE">Middle</option>
-                <option value="SENIOR">Senior</option>
-              </select>
-              <select value={form.availabilityStatus} onChange={(e) => setForm({ ...form, availabilityStatus: e.target.value })} className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm">
-                <option value="AVAILABLE">Available</option>
-                <option value="OPEN_TO_OFFERS">Open to offers</option>
-                <option value="NOT_AVAILABLE">Not available</option>
-              </select>
+              </LabeledField>
             </div>
           </section>
 
-          <section className="card p-6 space-y-4">
-            <h2 className="text-lg font-semibold text-slate-900">Additional Information</h2>
+          <section className="card p-6">
+            <h2 className="mb-4 text-lg font-semibold">Education</h2>
             <div className="grid gap-4 md:grid-cols-2">
-              <input value={form.headline} onChange={(e) => setForm({ ...form, headline: e.target.value })} className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm" placeholder="Professional headline" />
-              <input value={form.preferredRoles} onChange={(e) => setForm({ ...form, preferredRoles: e.target.value })} className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm" placeholder="Preferred roles" />
-              <textarea value={form.about} onChange={(e) => setForm({ ...form, about: e.target.value })} className="min-h-24 rounded-xl border border-slate-200 px-4 py-2.5 text-sm md:col-span-2" placeholder="About" />
-              <textarea value={form.experience} onChange={(e) => setForm({ ...form, experience: e.target.value })} className="min-h-20 rounded-xl border border-slate-200 px-4 py-2.5 text-sm" placeholder="Experience" />
-              <textarea value={form.projects} onChange={(e) => setForm({ ...form, projects: e.target.value })} className="min-h-20 rounded-xl border border-slate-200 px-4 py-2.5 text-sm" placeholder="Projects" />
-              <textarea value={form.languages} onChange={(e) => setForm({ ...form, languages: e.target.value })} className="min-h-20 rounded-xl border border-slate-200 px-4 py-2.5 text-sm" placeholder="Languages" />
-              <textarea value={form.achievements} onChange={(e) => setForm({ ...form, achievements: e.target.value })} className="min-h-20 rounded-xl border border-slate-200 px-4 py-2.5 text-sm" placeholder="Achievements" />
-              <textarea value={form.volunteering} onChange={(e) => setForm({ ...form, volunteering: e.target.value })} className="min-h-20 rounded-xl border border-slate-200 px-4 py-2.5 text-sm" placeholder="Volunteering" />
-              <input value={form.portfolioLinks} onChange={(e) => setForm({ ...form, portfolioLinks: e.target.value })} className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm md:col-span-2" placeholder="Portfolio links (comma separated)" />
-              <input value={form.githubUrl} onChange={(e) => setForm({ ...form, githubUrl: e.target.value })} className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm" placeholder="GitHub URL" />
-              <input value={form.linkedinUrl} onChange={(e) => setForm({ ...form, linkedinUrl: e.target.value })} className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm" placeholder="LinkedIn URL" />
+              <LabeledField label="University">
+                <input className="rounded-xl border border-slate-200 px-3 py-2 text-sm" value={form.university} onChange={(e)=>setForm({...form, university:e.target.value})} placeholder="Search or type university" />
+                <div className="mt-2 max-h-36 overflow-auto rounded-xl border border-slate-200 p-2">
+                  {KAZAKHSTAN_UNIVERSITIES.filter((u)=>u.toLowerCase().includes(form.university.toLowerCase())).slice(0,8).map((u)=><button key={u} type="button" onClick={()=>setForm({...form, university:u})} className="block w-full rounded px-2 py-1 text-left text-xs hover:bg-slate-50">{u}</button>)}
+                </div>
+              </LabeledField>
+              <LabeledField label="City">
+                <input className="rounded-xl border border-slate-200 px-3 py-2 text-sm" value={form.city} onChange={(e)=>setForm({...form, city:e.target.value})} placeholder="Search city" />
+                <div className="mt-2 max-h-36 overflow-auto rounded-xl border border-slate-200 p-2">
+                  {CITIES.filter((c)=>c.toLowerCase().includes(form.city.toLowerCase())).map((c)=><button key={c} type="button" onClick={()=>setForm({...form, city:c})} className="block w-full rounded px-2 py-1 text-left text-xs hover:bg-slate-50">{c}</button>)}
+                </div>
+              </LabeledField>
             </div>
           </section>
 
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <button type="button" onClick={() => setEditMode(false)} className="btn-secondary">Cancel</button>
-            <button disabled={saving} className="btn-primary disabled:opacity-60">{saving ? 'Saving profile...' : 'Save profile'}</button>
-          </div>
+          <section className="card p-6">
+            <h2 className="mb-4 text-lg font-semibold">Skills</h2>
+            <div className="grid gap-4 md:grid-cols-2">
+              <LabeledField label="Skills and Topics"><input className="rounded-xl border border-slate-200 px-3 py-2 text-sm" placeholder="Type and press Enter" onKeyDown={(e)=>{ if(e.key==='Enter'){e.preventDefault(); addSkill((e.target as HTMLInputElement).value,'skills'); (e.target as HTMLInputElement).value='';}}} /><div className="mt-2 flex flex-wrap gap-2">{form.skills.map((x:string)=><span key={x} className="rounded-full bg-blue-50 px-3 py-1 text-xs text-blue-700">{x}</span>)}</div><div className="mt-2 flex flex-wrap gap-1">{SKILLS.slice(0,12).map((s)=><button key={s} type="button" onClick={()=>addSkill(s,'skills')} className="rounded-full border px-2 py-0.5 text-xs">{s}</button>)}</div></LabeledField>
+              <LabeledField label="Interests"><input className="rounded-xl border border-slate-200 px-3 py-2 text-sm" placeholder="Type and press Enter" onKeyDown={(e)=>{ if(e.key==='Enter'){e.preventDefault(); addSkill((e.target as HTMLInputElement).value,'interests'); (e.target as HTMLInputElement).value='';}}} /><div className="mt-2 flex flex-wrap gap-2">{form.interests.map((x:string)=><span key={x} className="rounded-full bg-indigo-50 px-3 py-1 text-xs text-indigo-700">{x}</span>)}</div><div className="mt-2 flex flex-wrap gap-1">{INTERESTS.map((s)=><button key={s} type="button" onClick={()=>addSkill(s,'interests')} className="rounded-full border px-2 py-0.5 text-xs">{s}</button>)}</div></LabeledField>
+            </div>
+          </section>
+
+          <section className="card p-6">
+            <h2 className="mb-4 text-lg font-semibold">Certificates</h2>
+            <div className="grid gap-4 md:grid-cols-2">
+              <LabeledField label="Certificate Name"><input className="rounded-xl border border-slate-200 px-3 py-2 text-sm" value={newCertificate.name} onChange={(e)=>setNewCertificate({...newCertificate,name:e.target.value})} /></LabeledField>
+              <LabeledField label="Issued By"><input className="rounded-xl border border-slate-200 px-3 py-2 text-sm" value={newCertificate.issuer||''} onChange={(e)=>setNewCertificate({...newCertificate,issuer:e.target.value})} /></LabeledField>
+              <LabeledField label="Issue Date"><input type="date" className="rounded-xl border border-slate-200 px-3 py-2 text-sm" value={newCertificate.issueDate||''} onChange={(e)=>setNewCertificate({...newCertificate,issueDate:e.target.value})} /></LabeledField>
+              <LabeledField label="Expiration Date"><input type="date" disabled={newCertificate.doesNotExpire} className="rounded-xl border border-slate-200 px-3 py-2 text-sm" value={newCertificate.expirationDate||''} onChange={(e)=>setNewCertificate({...newCertificate,expirationDate:e.target.value})} /></LabeledField>
+              <LabeledField label="Does Not Expire"><input type="checkbox" checked={!!newCertificate.doesNotExpire} onChange={(e)=>setNewCertificate({...newCertificate,doesNotExpire:e.target.checked})} /></LabeledField>
+              <LabeledField label="Skills/Topics Covered"><input className="rounded-xl border border-slate-200 px-3 py-2 text-sm" value={toCsv(newCertificate.skillsCovered||[])} onChange={(e)=>setNewCertificate({...newCertificate,skillsCovered:fromCsv(e.target.value)})} /></LabeledField>
+              <LabeledField label="Description"><textarea className="min-h-24 rounded-xl border border-slate-200 px-3 py-2 text-sm" value={newCertificate.description||''} onChange={(e)=>setNewCertificate({...newCertificate,description:e.target.value})} /></LabeledField>
+              <LabeledField label="Certificate PDF"><input type="file" accept="application/pdf" onChange={(e)=>uploadCertificateFile(e.target.files?.[0])} /></LabeledField>
+            </div>
+            <button type="button" className="mt-3 rounded-lg border px-3 py-2 text-sm" onClick={()=>{ if(!newCertificate.name || !newCertificate.fileName) return setError('Certificate name and PDF are required.'); setForm({...form, certificateDocuments:[...form.certificateDocuments, newCertificate]}); setNewCertificate({name:'', fileName:''}); }}>Add certificate</button>
+            <div className="mt-3 space-y-2">{form.certificateDocuments.length?form.certificateDocuments.map((c:CertificateDoc,i:number)=><div key={`${c.name}-${i}`} className="rounded-xl border p-3 text-sm"><p className="font-medium">{c.name}</p><p className="text-xs text-slate-500">{c.issuer || 'Issuer n/a'} · {c.fileName}</p></div>):<EmptyState text="No certificates added yet." />}</div>
+          </section>
+
+          <section className="card p-6">
+            <h2 className="mb-4 text-lg font-semibold">Diplomas</h2>
+            <div className="grid gap-4 md:grid-cols-2">
+              <LabeledField label="University"><input className="rounded-xl border border-slate-200 px-3 py-2 text-sm" value={newDiploma.university} onChange={(e)=>setNewDiploma({...newDiploma,university:e.target.value})} /></LabeledField>
+              <LabeledField label="Degree"><input className="rounded-xl border border-slate-200 px-3 py-2 text-sm" value={newDiploma.degree||''} onChange={(e)=>setNewDiploma({...newDiploma,degree:e.target.value})} /></LabeledField>
+              <LabeledField label="Field of Study"><input className="rounded-xl border border-slate-200 px-3 py-2 text-sm" value={newDiploma.fieldOfStudy||''} onChange={(e)=>setNewDiploma({...newDiploma,fieldOfStudy:e.target.value})} /></LabeledField>
+              <LabeledField label="GPA"><input className="rounded-xl border border-slate-200 px-3 py-2 text-sm" value={newDiploma.gpa||''} onChange={(e)=>setNewDiploma({...newDiploma,gpa:e.target.value})} /></LabeledField>
+              <LabeledField label="Start Year"><input className="rounded-xl border border-slate-200 px-3 py-2 text-sm" value={newDiploma.startYear||''} onChange={(e)=>setNewDiploma({...newDiploma,startYear:e.target.value})} /></LabeledField>
+              <LabeledField label="Graduation Year"><input className="rounded-xl border border-slate-200 px-3 py-2 text-sm" value={newDiploma.graduationYear||''} onChange={(e)=>setNewDiploma({...newDiploma,graduationYear:e.target.value})} /></LabeledField>
+              <LabeledField label="Graduated"><input type="checkbox" checked={!!newDiploma.graduated} onChange={(e)=>setNewDiploma({...newDiploma,graduated:e.target.checked})} /></LabeledField>
+              <LabeledField label="Expected Graduation Year"><input disabled={newDiploma.graduated} className="rounded-xl border border-slate-200 px-3 py-2 text-sm" value={newDiploma.expectedGraduationYear||''} onChange={(e)=>setNewDiploma({...newDiploma,expectedGraduationYear:e.target.value})} /></LabeledField>
+              <LabeledField label="Notes"><textarea className="min-h-20 rounded-xl border border-slate-200 px-3 py-2 text-sm" value={newDiploma.notes||''} onChange={(e)=>setNewDiploma({...newDiploma,notes:e.target.value})} /></LabeledField>
+              <LabeledField label="Diploma PDF"><input type="file" accept="application/pdf" onChange={(e)=>uploadDiplomaFile(e.target.files?.[0])} /></LabeledField>
+            </div>
+            <button type="button" className="mt-3 rounded-lg border px-3 py-2 text-sm" onClick={()=>{ if(!newDiploma.university || !newDiploma.fileName) return setError('Diploma university and PDF are required.'); setForm({...form, diplomaDocuments:[...form.diplomaDocuments, newDiploma]}); setNewDiploma({university:'', fileName:'', graduated:true}); }}>Add diploma</button>
+            <div className="mt-3 space-y-2">{form.diplomaDocuments.length?form.diplomaDocuments.map((d:DiplomaDoc,i:number)=><div key={`${d.university}-${i}`} className="rounded-xl border p-3 text-sm"><p className="font-medium">{d.university}</p><p className="text-xs text-slate-500">{d.degree || 'Degree n/a'} · {d.fileName}</p></div>):<EmptyState text="No diplomas added yet." />}</div>
+          </section>
+
+          <section className="card p-6">
+            <h2 className="mb-4 text-lg font-semibold">Portfolio & Links</h2>
+            <div className="grid gap-4 md:grid-cols-2">
+              <LabeledField label="Portfolio Links"><input className="rounded-xl border border-slate-200 px-3 py-2 text-sm" value={form.portfolioLinks} onChange={(e)=>setForm({...form, portfolioLinks:e.target.value})} placeholder="Comma separated links" /></LabeledField>
+              <LabeledField label="GitHub URL"><input className="rounded-xl border border-slate-200 px-3 py-2 text-sm" value={form.githubUrl} onChange={(e)=>setForm({...form, githubUrl:e.target.value})} /></LabeledField>
+              <LabeledField label="LinkedIn URL"><input className="rounded-xl border border-slate-200 px-3 py-2 text-sm" value={form.linkedinUrl} onChange={(e)=>setForm({...form, linkedinUrl:e.target.value})} /></LabeledField>
+            </div>
+          </section>
+
+          <section className="card p-6">
+            <h2 className="mb-4 text-lg font-semibold">Career Preferences</h2>
+            <div className="grid gap-4 md:grid-cols-3">
+              <LabeledField label="Workplace Type"><select className="rounded-xl border border-slate-200 px-3 py-2 text-sm" value={form.workplaceType} onChange={(e)=>setForm({...form, workplaceType:e.target.value})}><option value="REMOTE">Remote</option><option value="HYBRID">Hybrid</option><option value="OFFICE">Office</option></select></LabeledField>
+              <LabeledField label="Career Level"><select className="rounded-xl border border-slate-200 px-3 py-2 text-sm" value={form.experienceLevel} onChange={(e)=>setForm({...form, experienceLevel:e.target.value})}><option value="INTERN">Intern</option><option value="JUNIOR">Junior</option><option value="MIDDLE">Middle</option><option value="SENIOR">Senior</option></select></LabeledField>
+              <LabeledField label="Availability"><select className="rounded-xl border border-slate-200 px-3 py-2 text-sm" value={form.availabilityStatus} onChange={(e)=>setForm({...form, availabilityStatus:e.target.value})}><option value="AVAILABLE">Available</option><option value="OPEN_TO_OFFERS">Open to offers</option><option value="NOT_AVAILABLE">Not available</option></select></LabeledField>
+            </div>
+          </section>
+
+          <section className="card p-6">
+            <h2 className="mb-4 text-lg font-semibold">Additional Information</h2>
+            <div className="grid gap-4 md:grid-cols-2">
+              <LabeledField label="Professional Headline"><input className="rounded-xl border border-slate-200 px-3 py-2 text-sm" value={form.headline} onChange={(e)=>setForm({...form, headline:e.target.value})} /></LabeledField>
+              <LabeledField label="Preferred Roles"><input className="rounded-xl border border-slate-200 px-3 py-2 text-sm" value={form.preferredRoles} onChange={(e)=>setForm({...form, preferredRoles:e.target.value})} /></LabeledField>
+              <LabeledField label="About"><textarea className="min-h-24 rounded-xl border border-slate-200 px-3 py-2 text-sm" value={form.about} onChange={(e)=>setForm({...form, about:e.target.value})} /></LabeledField>
+              <LabeledField label="Experience"><textarea className="min-h-24 rounded-xl border border-slate-200 px-3 py-2 text-sm" value={form.experience} onChange={(e)=>setForm({...form, experience:e.target.value})} /></LabeledField>
+              <LabeledField label="Projects"><textarea className="min-h-24 rounded-xl border border-slate-200 px-3 py-2 text-sm" value={form.projects} onChange={(e)=>setForm({...form, projects:e.target.value})} /></LabeledField>
+              <LabeledField label="Languages"><textarea className="min-h-24 rounded-xl border border-slate-200 px-3 py-2 text-sm" value={form.languages} onChange={(e)=>setForm({...form, languages:e.target.value})} /></LabeledField>
+              <LabeledField label="Achievements"><textarea className="min-h-24 rounded-xl border border-slate-200 px-3 py-2 text-sm" value={form.achievements} onChange={(e)=>setForm({...form, achievements:e.target.value})} /></LabeledField>
+              <LabeledField label="Volunteering"><textarea className="min-h-24 rounded-xl border border-slate-200 px-3 py-2 text-sm" value={form.volunteering} onChange={(e)=>setForm({...form, volunteering:e.target.value})} /></LabeledField>
+            </div>
+          </section>
+
+          <div className="flex justify-end"><button disabled={saving} className="btn-primary disabled:opacity-60">{saving ? 'Saving profile...' : 'Save profile'}</button></div>
         </form>
+      ) : (
+        <div className="space-y-6">
+          <section className="card p-6"><h2 className="text-lg font-semibold">About</h2><p className="mt-2 text-sm text-slate-600">{form.about || 'No about information yet.'}</p></section>
+          <section className="card p-6"><h2 className="text-lg font-semibold">Skills</h2><div className="mt-2 flex flex-wrap gap-2">{form.skills.length?form.skills.map((x:string)=><span key={x} className="pill">{x}</span>):<EmptyState text="No skills yet." />}</div></section>
+          <section className="card p-6"><h2 className="text-lg font-semibold">Education</h2><p className="mt-2 text-sm">{form.university || 'University not set'} · {form.city || 'City not set'}</p></section>
+          <section className="card p-6"><h2 className="text-lg font-semibold">Certificates</h2>{form.certificateDocuments.length?form.certificateDocuments.map((x:CertificateDoc,i:number)=><p key={i} className="mt-2 text-sm">{x.name} — {x.issuer || 'Issuer n/a'}</p>):<EmptyState text="No certificates yet." />}</section>
+          <section className="card p-6"><h2 className="text-lg font-semibold">Diplomas</h2>{form.diplomaDocuments.length?form.diplomaDocuments.map((x:DiplomaDoc,i:number)=><p key={i} className="mt-2 text-sm">{x.university} — {x.degree || 'Degree n/a'}</p>):<EmptyState text="No diplomas yet." />}</section>
+          <section className="card p-6"><h2 className="text-lg font-semibold">Projects</h2><p className="mt-2 text-sm text-slate-600">{form.projects || 'No projects information yet.'}</p></section>
+          <section className="card p-6"><h2 className="text-lg font-semibold">Languages</h2><p className="mt-2 text-sm text-slate-600">{form.languages || 'No languages yet.'}</p></section>
+          <section className="card p-6"><h2 className="text-lg font-semibold">Achievements</h2><p className="mt-2 text-sm text-slate-600">{form.achievements || 'No achievements yet.'}</p></section>
+          <section className="card p-6"><h2 className="text-lg font-semibold">Volunteering</h2><p className="mt-2 text-sm text-slate-600">{form.volunteering || 'No volunteering details yet.'}</p></section>
+          <section className="card p-6"><h2 className="text-lg font-semibold">Portfolio</h2>{fromCsv(form.portfolioLinks).length?fromCsv(form.portfolioLinks).map((x:string)=><a key={x} href={x} target="_blank" rel="noreferrer" className="mt-2 block text-sm text-blue-700 underline">{x}</a>):<EmptyState text="No portfolio links yet." />}</section>
+          <section className="card p-6"><h2 className="text-lg font-semibold">Career Preferences</h2><p className="mt-2 text-sm">{form.workplaceType} · {form.experienceLevel} · {form.availabilityStatus}</p></section>
+        </div>
       )}
     </div>
   );
