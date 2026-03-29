@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
+const ACCESS_COOKIE_NAME = 'auth_token';
 
 type TokenPayload = { role?: 'STUDENT' | 'CLIENT' | 'ADMIN'; exp?: number };
 
@@ -18,7 +19,7 @@ function decodeJwtPayload(token?: string): TokenPayload | null {
 
 export function middleware(req: NextRequest) {
   const path = req.nextUrl.pathname;
-  const token = req.cookies.get('token')?.value;
+  const token = req.cookies.get(ACCESS_COOKIE_NAME)?.value;
   const payload = decodeJwtPayload(token);
   const role = payload?.role;
 

@@ -4,6 +4,8 @@ import { ApiError } from '@/lib/api';
 
 const secret = process.env.JWT_SECRET || 'dev_secret';
 const issuer = 'uniwork-platform';
+export const ACCESS_COOKIE_NAME = 'auth_token';
+export const REFRESH_COOKIE_NAME = 'refresh_token';
 
 export type AuthPayload = { userId: string; role: 'STUDENT' | 'CLIENT' | 'ADMIN'; tokenType?: 'access' | 'refresh' };
 
@@ -24,7 +26,7 @@ export function verifyToken(token: string) {
 }
 
 export function getUserFromCookie() {
-  const token = cookies().get('token')?.value;
+  const token = cookies().get(ACCESS_COOKIE_NAME)?.value;
   if (!token) return null;
   const payload = verifyToken(token);
   if (!payload || payload.tokenType !== 'access') return null;

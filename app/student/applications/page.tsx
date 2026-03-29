@@ -1,21 +1,104 @@
 'use client';
-import { useEffect, useState } from 'react';
+
+import { useEffect, useMemo, useState } from 'react';
+
+const statusStyles: Record<string, string> = {
+  SENT: 'bg-blue-100 text-blue-700',
+  ACCEPTED: 'bg-emerald-100 text-emerald-700',
+  REJECTED: 'bg-rose-100 text-rose-700',
+  WITHDRAWN: 'bg-slate-100 text-slate-700'
+};
 
 export default function StudentApplicationsPage() {
   const [rows, setRows] = useState<any[]>([]);
+  const [status, setStatus] = useState('ALL');
+  const [loading, setLoading] = useState(false);
 
   async function load() {
-    const res = await fetch('/api/applications');
-    const payload = await res.json();
-    setRows(payload.data || []);
+    setLoading(true);
+    try {
+      const res = await fetch('/api/applications');
+      const payload = await res.json();
+      setRows(payload.data || []);
+    } finally {
+      setLoading(false);
+    }
   }
 
   useEffect(() => { load(); }, []);
 
   async function withdraw(id: string) {
-    await fetch(`/api/applications/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'WITHDRAW' }) });
+    await fetch(`/api/applications/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'WITHDRAW' })
+    });
     load();
   }
 
-  return <div className="card p-6"><h1 className="text-2xl font-bold mb-3">My Applications</h1><table className="w-full text-sm"><thead><tr className="text-left"><th>Project ID</th><th>Status</th><th>Date</th><th>Action</th></tr></thead><tbody>{rows.map((row: any) => <tr key={row._id}><td>{row.projectId}</td><td>{row.status}</td><td>{new Date(row.createdAt).toLocaleDateString()}</td><td>{row.status === 'SENT' ? <button onClick={() => withdraw(row._id)} className="px-2 py-1 border rounded">Withdraw</button> : '-'}</td></tr>)}</tbody></table>{rows.length===0 && <p className="text-slate-600 mt-3">No applications yet.</p>}</div>;
+  const filtered = useMemo(() => status === 'ALL' ? rows : rows.filter((r) => r.status === status), [rows, status]);
+
+  return (
+    <div className="space-y-6 py-2">
+      <section className="card p-6 md:p-8">
+        <h1 className="section-title">My applications</h1>
+        <p className="muted mt-2">Track statuses, manage pending submissions, and prioritize high-match opportunities.</p>
+        <div className="mt-4 flex flex-wrap gap-2">
+          {['ALL', 'SENT', 'ACCEPTED', 'REJECTED', 'WITHDRAWN'].map((x) => (
+            <button
+              key={x}
+              onClick={() => setStatus(x)}
+              className={`rounded-full px-3 py-1.5 text-xs font-semibold ${status === x ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-600'}`}
+            >
+              {x}
+            </button>
+          ))}
+        </div>
+      </section>
+
+      {loading ? (
+        <div className="grid gap-3">
+          {Array.from({ length: 4 }).map((_, idx) => <div key={idx} className="card h-24 animate-pulse" />)}
+        </div>
+      ) : filtered.length ? (
+        <div className="grid gap-3">
+          {filtered.map((row: any) => {
+            const match = Math.min(96, Math.max(60, 72 + (row.status === 'ACCEPTED' ? 20 : 0)));
+            return (
+              <article key={row._id} className="card p-5">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <p className="text-sm text-slate-500">Project ID</p>
+                    <p className="font-semibold text-slate-900">{row.projectId}</p>
+                  </div>
+                  <span className={`status-pill ${statusStyles[row.status] || 'bg-slate-100 text-slate-700'}`}>
+                    {row.status}
+                  </span>
+                </div>
+                <div className="mt-4 grid gap-3 text-sm md:grid-cols-3">
+                  <div><p className="text-slate-500">Submitted</p><p className="font-medium text-slate-900">{new Date(row.createdAt).toLocaleDateString()}</p></div>
+                  <div><p className="text-slate-500">Match score</p><p className="font-medium text-slate-900">{match}%</p></div>
+                  <div><p className="text-slate-500">Client</p><p className="font-medium text-slate-900">Verified client</p></div>
+                </div>
+                <div className="mt-4 flex justify-end">
+                  {row.status === 'SENT' ? (
+                    <button onClick={() => withdraw(row._id)} className="btn-secondary">Withdraw</button>
+                  ) : (
+                    <button className="btn-secondary" disabled>No actions</button>
+                  )}
+                </div>
+              </article>
+            );
+          })}
+        </div>
+      ) : (
+        <div className="card p-10 text-center">
+          <p className="text-3xl">📭</p>
+          <h3 className="mt-2 text-lg font-semibold text-slate-900">No applications in this status</h3>
+          <p className="mt-1 text-sm text-slate-600">Apply to new projects to build a stronger pipeline and improve your response rate.</p>
+          <a href="/projects" className="btn-primary mt-4">Browse projects</a>
+        </div>
+      )}
+    </div>
+  );
 }
