@@ -44,6 +44,7 @@ type ProfileData = {
   bio: string;
   about: string;
   headline?: string;
+  experience?: string;
   projects?: string;
   languages?: string;
   achievements?: string;
@@ -52,11 +53,13 @@ type ProfileData = {
   skills: string[];
   interests: string[];
   certificates: string[];
+  diplomas?: string[];
   certificateDocuments?: CertificateDoc[];
   diplomaDocuments?: DiplomaDoc[];
   portfolioLinks: string[];
   githubUrl: string;
   linkedinUrl: string;
+  avatar?: string;
   avatarDataUrl?: string;
   experienceLevel: string;
   availabilityStatus: string;
@@ -118,9 +121,12 @@ export default function StudentProfilePage() {
     university: '', city: '', workplaceType: 'REMOTE',
     headline: '', preferredRoles: '', about: '', bio: '', experience: '', projects: '', languages: '', achievements: '', volunteering: '',
     skills: [] as string[], interests: [] as string[],
+    certificates: [] as string[],
+    diplomas: [] as string[],
     githubUrl: '', linkedinUrl: '', portfolioLinks: '',
     experienceLevel: 'JUNIOR', availabilityStatus: 'AVAILABLE',
     avatarDataUrl: '',
+    avatar: '',
     certificateDocuments: [] as CertificateDoc[],
     diplomaDocuments: [] as DiplomaDoc[]
   });
@@ -163,8 +169,11 @@ export default function StudentProfilePage() {
           experienceLevel: p.experienceLevel || 'JUNIOR',
           availabilityStatus: p.availabilityStatus || 'AVAILABLE',
           avatarDataUrl: p.avatarDataUrl || '',
+          avatar: p.avatar || p.avatarDataUrl || '',
           certificateDocuments: p.certificateDocuments || [],
-          diplomaDocuments: p.diplomaDocuments || []
+          diplomaDocuments: p.diplomaDocuments || [],
+          certificates: p.certificates || [],
+          diplomas: p.diplomas || []
         }));
         setEdit(false);
       } catch (e: any) {
@@ -205,12 +214,14 @@ export default function StudentProfilePage() {
         skills: form.skills,
         interests: form.interests,
         certificates: form.certificateDocuments.map((x: CertificateDoc) => x.name),
+        diplomas: form.diplomaDocuments.map((x: DiplomaDoc) => `${x.university} ${x.degree || ''}`.trim()),
         certificateDocuments: form.certificateDocuments,
         diplomaDocuments: form.diplomaDocuments,
         portfolioLinks: fromCsv(form.portfolioLinks),
         githubUrl: form.githubUrl,
         linkedinUrl: form.linkedinUrl,
         avatarDataUrl: form.avatarDataUrl,
+        avatar: form.avatarDataUrl,
         experienceLevel: form.experienceLevel,
         availabilityStatus: form.availabilityStatus
       };

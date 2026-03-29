@@ -19,6 +19,7 @@ const StudentProfileSchema = new Schema({
   experienceLevel: String,
   portfolioLinks: [String],
   certificates: [String],
+  diplomas: [String],
   certificateDocuments: [{
     name: String,
     issuer: String,
@@ -51,6 +52,7 @@ const StudentProfileSchema = new Schema({
   resumeText: String,
   about: String,
   avatarDataUrl: String,
+  avatar: String,
   availabilityStatus: String,
   savedProjects: [{ type: Schema.Types.ObjectId, ref: 'Project' }]
 }, { timestamps: true });
