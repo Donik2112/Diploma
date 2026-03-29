@@ -120,7 +120,7 @@ export async function POST(req: NextRequest) {
 
     let mlRes: Response;
     try {
-      mlRes = await fetch(`${ML_API_URL}/recommend-projects`, {
+      mlRes = await fetch(`${ML_API_URL}/recommend`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
