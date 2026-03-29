@@ -2,7 +2,7 @@ import { z } from 'zod';
 import type { SortOrder } from 'mongoose';
 import { NextResponse } from 'next/server';
 import Project from '@/models/Project';
-import { connectDB } from '@/lib/db';
+import { dbConnect } from '@/lib/mongodb';
 import { requireAuth } from '@/lib/auth';
 
 const createSchema = z.object({
@@ -20,7 +20,7 @@ const createSchema = z.object({
 
 export async function GET(req: Request) {
   try {
-    await connectDB();
+    await dbConnect();
     const { searchParams } = new URL(req.url);
     const q = searchParams.get('q') || '';
     const category = searchParams.get('category') || '';
@@ -51,7 +51,7 @@ export async function GET(req: Request) {
 
 export async function POST(req: Request) {
   try {
-    await connectDB();
+    await dbConnect();
     const user = requireAuth(['CLIENT', 'ADMIN']);
     const body = createSchema.parse(await req.json());
 

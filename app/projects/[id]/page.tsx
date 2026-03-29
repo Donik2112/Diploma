@@ -6,7 +6,7 @@ export default function ProjectDetails() {
   const [project, setProject] = useState<any>(null);
   const [message, setMessage] = useState('');
   const params = useParams<{ id: string }>();
-  const id = params.id;
+  const id = params?.id ?? '';
 
   useEffect(() => {
     if (!id) return;

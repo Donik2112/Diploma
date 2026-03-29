@@ -1,1 +1,1 @@
-export { dbConnect as connectDB } from '@/lib/mongodb';
+export { dbConnect as connectDB } from './mongodb';
