@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getUserFromCookie } from '@/lib/auth';
 import { dbConnect } from '@/lib/mongodb';
 import StudentProfile from '@/models/StudentProfile';
+import Project from '@/models/Project';
 import { getProfileReadiness } from '@/lib/profileReadiness';
 
 export const dynamic = 'force-dynamic';
@@ -28,6 +29,20 @@ function extractRecommendations(raw: any): any[] {
   return [];
 }
 
+function toProjectText(project: any) {
+  return {
+    project_id: String(project?._id || ''),
+    title: String(project?.title || ''),
+    skills: Array.isArray(project?.requiredSkills)
+      ? project.requiredSkills.join(', ')
+      : '',
+    text: String(project?.description || ''),
+    experience_level: String(project?.experienceLevel || ''),
+    employment_type: String(project?.employmentType || ''),
+    city: String(project?.city || ''),
+  };
+}
+
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json().catch(() => ({}));
@@ -45,10 +60,23 @@ export async function POST(req: NextRequest) {
     const authUser = getUserFromCookie();
     let profile: any = null;
 
+    await dbConnect();
+
     if (authUser?.role === 'STUDENT') {
-      await dbConnect();
       profile = await StudentProfile.findOne({ userId: authUser.userId }).lean();
     }
+
+    const openProjects = await Project.find({ status: 'OPEN' })
+      .select({
+        _id: 1,
+        title: 1,
+        description: 1,
+        requiredSkills: 1,
+        city: 1,
+        employmentType: 1,
+        experienceLevel: 1,
+      })
+      .lean();
 
     const payload = {
       skills: body.skills || toStringList(profile?.skills).join(', '),
@@ -57,6 +85,7 @@ export async function POST(req: NextRequest) {
       employment: body.employment || '',
       city: body.city || profile?.city || '',
       top_n: Number(body.top_n || 10),
+      projects: openProjects.map(toProjectText),
     };
 
     const profileReadiness = getProfileReadiness(profile);
@@ -75,12 +104,23 @@ export async function POST(req: NextRequest) {
       });
     }
 
+    if (!openProjects.length) {
+      return NextResponse.json({
+        success: true,
+        source: 'ML API',
+        warnings: ['No open projects available for recommendations yet.'],
+        profileReadiness,
+        data: { recommendations: [] },
+        recommendations: [],
+      });
+    }
+
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 20000);
 
     let mlRes: Response;
     try {
-      mlRes = await fetch(`${ML_API_URL}/recommend`, {
+      mlRes = await fetch(`${ML_API_URL}/recommend-projects`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

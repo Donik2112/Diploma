@@ -1,6 +1,6 @@
 export type JobRecommendation = {
-  vacancy_id?: string;
-  job_title?: string;
+  project_id?: string;
+  title?: string;
   skills?: string;
   text?: string;
   experience_level?: string;
@@ -12,6 +12,7 @@ export type JobRecommendation = {
   rank_score?: number;
   final_score?: number;
   match_reason?: string;
+  predicted_family?: string;
 };
 
 export function extractRecommendations(payload: any): JobRecommendation[] {

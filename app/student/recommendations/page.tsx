@@ -23,6 +23,7 @@ export default function RecommendationsPage() {
     missingFields: [],
     recommendationMode: 'ready',
   });
+  const [applyStatus, setApplyStatus] = useState<Record<string, string>>({});
 
   useEffect(() => {
     fetch('/api/recommend', {
@@ -52,7 +53,7 @@ export default function RecommendationsPage() {
     const arr = [...items];
     if (sort === 'title') {
       arr.sort((a, b) =>
-        String(a.job_title || '').localeCompare(String(b.job_title || ''))
+        String(a.title || '').localeCompare(String(b.title || ''))
       );
     } else {
       arr.sort((a, b) => Number(b.final_score || 0) - Number(a.final_score || 0));
@@ -64,10 +65,42 @@ export default function RecommendationsPage() {
     profileReadiness.recommendationMode === 'ready' &&
     canRenderMatchPercent(minScore, maxScore);
 
+  const applyToProject = async (projectId?: string) => {
+    if (!projectId) return;
+    setApplyStatus((prev) => ({ ...prev, [projectId]: 'Submitting...' }));
+    try {
+      const res = await fetch('/api/applications', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          projectId,
+          coverLetter:
+            'I am interested in this project and can deliver quality results on time.',
+          proposedPrice: 300,
+          estimatedDuration: '14 days',
+        }),
+      });
+      const payload = await res.json();
+      if (!res.ok) {
+        setApplyStatus((prev) => ({
+          ...prev,
+          [projectId]: payload?.error?.message || payload?.error || 'Failed to apply.',
+        }));
+        return;
+      }
+      setApplyStatus((prev) => ({ ...prev, [projectId]: 'Application sent successfully.' }));
+    } catch (error: any) {
+      setApplyStatus((prev) => ({
+        ...prev,
+        [projectId]: error?.message || 'Failed to apply.',
+      }));
+    }
+  };
+
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-3xl font-bold">Recommended Jobs</h1>
+        <h1 className="text-3xl font-bold">Recommended Projects</h1>
         <select className="rounded px-3 py-1 border" value={sort} onChange={(e) => setSort(e.target.value as any)}>
           <option value="match">Sort by match score</option>
           <option value="title">Sort by title</option>
@@ -107,9 +140,9 @@ export default function RecommendationsPage() {
       )}
 
       {profileReadiness.recommendationMode !== 'blocked' && rendered.map((i, idx) => (
-        <div key={i.vacancy_id || `${i.job_title || 'job'}-${idx}`} className="card p-4">
+        <div key={i.project_id || `${i.title || 'project'}-${idx}`} className="card p-4">
           <div className="flex justify-between gap-3">
-            <h3 className="font-semibold">{i.job_title || `Recommendation #${idx + 1}`}</h3>
+            <h3 className="font-semibold">{i.title || `Recommendation #${idx + 1}`}</h3>
             {showPercent ? (
               <span className="text-brand font-semibold">
                 {scoreToPercent(Number(i.final_score), minScore, maxScore)}% match
@@ -134,15 +167,15 @@ export default function RecommendationsPage() {
             <p>Salary: {i.salary || 'Not specified'}</p>
           </div>
           <p className="mt-2 text-xs text-slate-500">
-            Family: <span className="font-medium text-slate-700">{i.job_family || 'Not specified'}</span>
+            Family: <span className="font-medium text-slate-700">{i.predicted_family || 'Not specified'}</span>
           </p>
           <p className="mt-2 rounded bg-slate-50 p-2 text-xs text-slate-600">
             {trimDescription(i.match_reason || 'Match explanation is not available yet.', 180)}
           </p>
           <div className="mt-3 flex flex-wrap items-center gap-2">
-            {i.vacancy_id ? (
+            {i.project_id ? (
               <Link
-                href={`/projects/${encodeURIComponent(i.vacancy_id)}`}
+                href={`/projects/${encodeURIComponent(i.project_id)}`}
                 className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100"
               >
                 View details
@@ -152,23 +185,24 @@ export default function RecommendationsPage() {
                 type="button"
                 disabled
                 className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-400"
-                title="Vacancy ID is not available for this recommendation."
+                title="Project ID is not available for this recommendation."
               >
                 View details
               </button>
             )}
             <button
               type="button"
-              disabled
-              className="rounded-lg bg-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-500"
-              title="Application flow will be connected after vacancy-to-project mapping."
+              onClick={() => applyToProject(i.project_id)}
+              disabled={!i.project_id}
+              className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white disabled:bg-slate-300"
+              title={!i.project_id ? 'Project ID is not available for this recommendation.' : 'Apply now'}
             >
               Apply now
             </button>
           </div>
-          <p className="mt-2 text-xs text-slate-500">
-            Application flow will be connected next after mapping ML vacancy IDs to platform project records.
-          </p>
+          {i.project_id && applyStatus[i.project_id] && (
+            <p className="mt-2 text-xs text-slate-500">{applyStatus[i.project_id]}</p>
+          )}
         </div>
       ))}
     </div>

@@ -23,6 +23,7 @@ export default function StudentDashboard() {
     missingFields: [],
     recommendationMode: 'ready',
   });
+  const [applyStatus, setApplyStatus] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -65,6 +66,38 @@ export default function StudentDashboard() {
   const showPercent =
     profileReadiness.recommendationMode === 'ready' &&
     canRenderMatchPercent(minScore, maxScore);
+
+  const applyToProject = async (projectId?: string) => {
+    if (!projectId) return;
+    setApplyStatus((prev) => ({ ...prev, [projectId]: 'Submitting...' }));
+    try {
+      const res = await fetch('/api/applications', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          projectId,
+          coverLetter:
+            'I am interested in this project and can deliver quality results on time.',
+          proposedPrice: 300,
+          estimatedDuration: '14 days',
+        }),
+      });
+      const payload = await res.json();
+      if (!res.ok) {
+        setApplyStatus((prev) => ({
+          ...prev,
+          [projectId]: payload?.error?.message || payload?.error || 'Failed to apply.',
+        }));
+        return;
+      }
+      setApplyStatus((prev) => ({ ...prev, [projectId]: 'Application sent successfully.' }));
+    } catch (error: any) {
+      setApplyStatus((prev) => ({
+        ...prev,
+        [projectId]: error?.message || 'Failed to apply.',
+      }));
+    }
+  };
   return (
     <div className="space-y-6 py-2">
       <section className="card p-7 md:p-10">
@@ -127,17 +160,17 @@ export default function StudentDashboard() {
           ) : recommendations.length ? (
             <div className="mt-4 space-y-3">
               {recommendations.slice(0, 4).map((rec: any, idx: number) => (
-                <div key={rec.vacancy_id || `${rec.job_title || 'job'}-${idx}`} className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                <div key={rec.project_id || `${rec.title || 'project'}-${idx}`} className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
                   <div className="flex items-start justify-between gap-3">
                     <div>
-                      <p className="font-semibold text-slate-900">{rec.job_title || `Recommendation #${idx + 1}`}</p>
+                      <p className="font-semibold text-slate-900">{rec.title || `Recommendation #${idx + 1}`}</p>
                       <p className="mt-1 text-sm text-slate-600">
                         {trimDescription(rec.match_reason || 'Match explanation is not available yet.', 120)}
                       </p>
                       <div className="mt-2 flex flex-wrap items-center gap-2">
-                        {rec.vacancy_id ? (
+                        {rec.project_id ? (
                           <Link
-                            href={`/projects/${encodeURIComponent(rec.vacancy_id)}`}
+                            href={`/projects/${encodeURIComponent(rec.project_id)}`}
                             className="rounded-md border border-slate-300 px-2.5 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-100"
                           >
                             View details
@@ -147,20 +180,24 @@ export default function StudentDashboard() {
                             type="button"
                             disabled
                             className="rounded-md border border-slate-200 px-2.5 py-1 text-xs font-semibold text-slate-400"
-                            title="Vacancy ID is not available for this recommendation."
+                            title="Project ID is not available for this recommendation."
                           >
                             View details
                           </button>
                         )}
                         <button
                           type="button"
-                          disabled
-                          className="rounded-md bg-slate-200 px-2.5 py-1 text-xs font-semibold text-slate-500"
-                          title="Application flow will be connected after vacancy-to-project mapping."
+                          onClick={() => applyToProject(rec.project_id)}
+                          disabled={!rec.project_id}
+                          className="rounded-md bg-blue-600 px-2.5 py-1 text-xs font-semibold text-white disabled:bg-slate-300"
+                          title={!rec.project_id ? 'Project ID is not available for this recommendation.' : 'Apply now'}
                         >
                           Apply now
                         </button>
                       </div>
+                      {rec.project_id && applyStatus[rec.project_id] && (
+                        <p className="mt-1 text-xs text-slate-500">{applyStatus[rec.project_id]}</p>
+                      )}
                     </div>
                     <span className="status-pill bg-blue-100 text-blue-700">
                       {showPercent
