@@ -3,9 +3,36 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 
+type JobRecommendation = {
+  id?: string;
+  job_title?: string;
+  match_reason?: string;
+  final_score?: number | string;
+};
+
+function scoreToMatchPercent(finalScore: unknown): number {
+  const score = Number(finalScore);
+  if (!Number.isFinite(score)) return 60;
+  if (score >= 5) return 95;
+  if (score >= 4) return 90;
+  if (score >= 3) return 85;
+  if (score >= 2) return 78;
+  if (score >= 1) return 70;
+  return 60;
+}
+
+function extractRecommendations(payload: any): JobRecommendation[] {
+  const rows =
+    payload?.data?.recommendations ??
+    payload?.recommendations ??
+    payload?.data ??
+    [];
+  return Array.isArray(rows) ? rows : [];
+}
+
 export default function StudentDashboard() {
   const [applications, setApplications] = useState<any[]>([]);
-  const [recommendations, setRecommendations] = useState<any[]>([]);
+  const [recommendations, setRecommendations] = useState<JobRecommendation[]>([]);
   const [profileCompletion, setProfileCompletion] = useState(0);
   const [recommendSource, setRecommendSource] = useState('Loading...');
   const [recommendWarning, setRecommendWarning] = useState('');
@@ -27,7 +54,7 @@ export default function StudentDashboard() {
         const recData = await recRes.json();
         const profileData = await profileRes.json();
         setApplications(appData?.data || []);
-        setRecommendations(recData?.data?.recommendations || recData?.recommendations || []);
+        setRecommendations(extractRecommendations(recData));
         setProfileCompletion(Number(profileData?.data?.completion || 0));
         setRecommendSource(recData?.source || recData?.data?.source || 'ML API');
         const warnings = recData?.warnings || recData?.data?.warnings || [];
@@ -85,13 +112,15 @@ export default function StudentDashboard() {
           ) : recommendations.length ? (
             <div className="mt-4 space-y-3">
               {recommendations.slice(0, 4).map((rec: any, idx: number) => (
-                <div key={idx} className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                <div key={rec.id || `${rec.job_title || 'job'}-${idx}`} className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
                   <div className="flex items-start justify-between gap-3">
                     <div>
-                      <p className="font-semibold text-slate-900">{rec.title || `Recommended project #${idx + 1}`}</p>
-                      <p className="mt-1 text-sm text-slate-600">{rec.reason || rec.explanation || 'Based on your skills and profile history.'}</p>
+                      <p className="font-semibold text-slate-900">{rec.job_title || `Recommendation #${idx + 1}`}</p>
+                      <p className="mt-1 text-sm text-slate-600">{rec.match_reason || 'Match explanation is not available yet.'}</p>
                     </div>
-                    <span className="status-pill bg-blue-100 text-blue-700">{Math.round((rec.matchScore || rec.score || 0.8) * 100)}% match</span>
+                    <span className="status-pill bg-blue-100 text-blue-700">
+                      {scoreToMatchPercent(rec.final_score)}% match
+                    </span>
                   </div>
                 </div>
               ))}
