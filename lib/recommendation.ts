@@ -1,4 +1,5 @@
 import Project from '@/models/Project';
+import { getProfileReadiness } from '@/lib/profileReadiness';
 
 export type RecommendInput = {
   skills: string[];
@@ -7,26 +8,45 @@ export type RecommendInput = {
   interests?: string[];
   summary?: string;
   educationTrack?: string;
+  completenessPercent?: number;
   top_n?: number;
   strict_city?: boolean;
 };
 
-const MIN_SUMMARY_LENGTH = 80;
+function toReadiness(input: RecommendInput) {
+  return getProfileReadiness({
+    skills: input.skills,
+    interests: input.interests,
+    city: input.city,
+    experienceLevel: input.experience,
+    completenessPercent: input.completenessPercent
+  });
+}
 
-function hasEnoughSignals(input: RecommendInput) {
-  const summaryLength = (input.summary || '').trim().length;
-  return (
-    (input.skills || []).length >= 3 &&
-    (input.interests || []).length >= 1 &&
-    !!(input.city || '').trim() &&
-    summaryLength >= MIN_SUMMARY_LENGTH &&
-    (!!(input.educationTrack || '').trim() || !!(input.experience || '').trim())
-  );
+function attachUiMeta(recommendations: any[], ready: boolean) {
+  return recommendations.map((r: any) => ({
+    ...r,
+    showMatchScore: ready,
+    uiLabel: ready
+      ? `${r.matchScorePercent ?? Math.round((r.matchScore || 0) * 100)}% match`
+      : 'Preliminary'
+  }));
 }
 
 export async function getRecommendations(input: RecommendInput) {
-  const enoughSignals = hasEnoughSignals(input);
+  const profileReadiness = toReadiness(input);
+  const ready = profileReadiness.recommendationMode === 'ready';
   const url = process.env.PYTHON_RECOMMENDER_URL;
+
+  if (profileReadiness.recommendationMode === 'blocked') {
+    return {
+      source: 'Profile completion required',
+      hasEnoughSignals: false,
+      profileReadiness,
+      recommendations: []
+    };
+  }
+
   if (url) {
     const response = await fetch(url, {
       method: 'POST',
@@ -36,15 +56,14 @@ export async function getRecommendations(input: RecommendInput) {
     if (response.ok) {
       const recommendations = await response.json();
       return {
-        source: enoughSignals ? 'Personalized recommendations' : 'Starter recommendations',
-        hasEnoughSignals: enoughSignals,
-        recommendations: recommendations.map((r: any) => ({
+        source: ready ? 'Personalized recommendations' : 'Preliminary recommendations',
+        hasEnoughSignals: ready,
+        profileReadiness,
+        recommendations: attachUiMeta(recommendations, ready).map((r: any) => ({
           ...r,
-          showMatchScore: enoughSignals,
-          uiLabel: enoughSignals ? `${r.matchScorePercent ?? Math.round((r.matchScore || 0) * 100)}% match` : 'Preliminary recommendation',
-          explanation: enoughSignals
+          explanation: ready
             ? (r.explanation || 'Why this fits: profile and project signals are aligned.')
-            : 'Based on your education and activity. Add skills, interests, city, and summary to unlock accurate matching.'
+            : 'Based on limited profile data. Add more details to unlock accurate matching.'
         }))
       };
     }
@@ -59,9 +78,9 @@ export async function getRecommendations(input: RecommendInput) {
     const cityScore = input.city && p.city === input.city ? 0.1 : 0;
     const score = Math.min(1, skillScore * 0.7 + expScore + cityScore);
     const whyFits = [
-      matchedSkills.length ? `Matched skills: ${matchedSkills.slice(0, 3).join(', ')}` : '',
-      expScore ? 'Experience level aligned' : '',
-      cityScore ? 'City match' : ''
+      matchedSkills.length ? `Why this fits: ${matchedSkills.slice(0, 3).join(', ')}` : '',
+      expScore ? 'experience aligned' : '',
+      cityScore ? 'city match' : ''
     ].filter(Boolean).join(' • ');
 
     return {
@@ -69,17 +88,20 @@ export async function getRecommendations(input: RecommendInput) {
       title: p.title,
       matchScore: score,
       matchScorePercent: Math.round(score * 100),
-      showMatchScore: enoughSignals,
-      uiLabel: enoughSignals ? `${Math.round(score * 100)}% match` : 'Preliminary recommendation',
-      explanation: enoughSignals
-        ? (whyFits || 'Why this fits: category and baseline profile signals.')
-        : 'Based on your education and activity. Add skills, interests, city, and summary to unlock accurate matching.'
+      explanation: ready ? (whyFits || 'Why this fits: baseline profile + project signals.') : 'Based on limited profile data.'
     };
   }).filter((x) => x.matchScore > 0.05).sort((a, b) => b.matchScore - a.matchScore).slice(0, input.top_n || 10);
 
+  const recommendations = attachUiMeta(scored, ready);
+  const uniqueScores = new Set(recommendations.map((r: any) => r.matchScorePercent)).size;
+  const normalizedRecommendations = ready && uniqueScores <= 1
+    ? recommendations.map((r: any) => ({ ...r, showMatchScore: false, uiLabel: 'Low-confidence match' }))
+    : recommendations;
+
   return {
-    source: enoughSignals ? 'Personalized recommendations' : 'Starter recommendations',
-    hasEnoughSignals: enoughSignals,
-    recommendations: scored
+    source: ready ? 'Personalized recommendations' : 'Preliminary recommendations',
+    hasEnoughSignals: ready,
+    profileReadiness,
+    recommendations: normalizedRecommendations
   };
 }

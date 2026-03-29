@@ -14,6 +14,7 @@ const schema = z.object({
   interests: z.array(z.string()).optional(),
   summary: z.string().optional(),
   educationTrack: z.string().optional(),
+  completenessPercent: z.coerce.number().min(0).max(100).optional(),
   top_n: z.coerce.number().min(1).max(30).default(10),
   strict_city: z.boolean().optional()
 });
