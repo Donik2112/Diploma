@@ -31,6 +31,20 @@ type DiplomaDoc = {
   fileDataUrl?: string;
 };
 
+type ExperienceEntry = {
+  jobTitle: string;
+  employmentType?: string;
+  company?: string;
+  currentlyWorking?: boolean;
+  startMonth?: string;
+  startYear?: string;
+  endMonth?: string;
+  endYear?: string;
+  location?: string;
+  workplaceType?: string;
+  description?: string;
+};
+
 type ProfileData = {
   fullName?: string;
   email?: string;
@@ -46,6 +60,7 @@ type ProfileData = {
   headline?: string;
   experience?: string;
   projects?: string;
+  experienceEntries?: ExperienceEntry[];
   languages?: string;
   achievements?: string;
   volunteering?: string;
@@ -72,6 +87,7 @@ const SKILLS = ['Python','JavaScript','TypeScript','SQL','PostgreSQL','React','N
 const INTERESTS = ['Data Science','Analytics','Recommendation Systems','Backend','Frontend','Mobile Development','Product Management','Research','Open Source'];
 const LANGUAGE_OPTIONS = ['English','Russian','Kazakh','Turkish','German','French','Chinese','Spanish','Korean','Arabic'];
 const DEGREE_OPTIONS = ['Bachelor’s','Master’s','PhD','Associate','Diploma','Foundation','Certificate Program','Other'];
+const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 
 function fromCsv(value: string) {
   return value.split(',').map((x) => x.trim()).filter(Boolean);
@@ -120,6 +136,8 @@ export default function StudentProfilePage() {
 
   const [editingCertificateIndex, setEditingCertificateIndex] = useState<number | null>(null);
   const [editingDiplomaIndex, setEditingDiplomaIndex] = useState<number | null>(null);
+  const [editingExperienceIndex, setEditingExperienceIndex] = useState<number | null>(null);
+  const [languageQuery, setLanguageQuery] = useState('');
 
   const [form, setForm] = useState<any>({
     firstName: '', lastName: '', birthDate: '', phone: '', email: '',
@@ -131,11 +149,13 @@ export default function StudentProfilePage() {
     experienceLevel: 'JUNIOR', availabilityStatus: 'AVAILABLE',
     avatarDataUrl: '',
     certificateDocuments: [] as CertificateDoc[],
-    diplomaDocuments: [] as DiplomaDoc[]
+    diplomaDocuments: [] as DiplomaDoc[],
+    experienceEntries: [] as ExperienceEntry[]
   });
 
   const [certificateDraft, setCertificateDraft] = useState<CertificateDoc>({ name: '', fileName: '' });
   const [diplomaDraft, setDiplomaDraft] = useState<DiplomaDoc>({ university: '', fileName: '', graduated: true });
+  const [experienceDraft, setExperienceDraft] = useState<ExperienceEntry>({ jobTitle: '', currentlyWorking: true, workplaceType: 'Remote' });
 
   useEffect(() => {
     (async () => {
@@ -161,6 +181,7 @@ export default function StudentProfilePage() {
           bio: p.bio || '',
           experience: p.experience || '',
           projects: p.projects || '',
+          experienceEntries: p.experienceEntries || [],
           languages: p.languages || '',
           languageSelections: fromCsv(p.languages || ''),
           achievements: p.achievements || '',
@@ -237,6 +258,7 @@ export default function StudentProfilePage() {
         headline: form.headline,
         experience: form.experience,
         projects: form.projects,
+        experienceEntries: form.experienceEntries,
         languages: (form.languageSelections || []).join(', '),
         achievements: form.achievements,
         volunteering: form.volunteering,
@@ -348,13 +370,71 @@ export default function StudentProfilePage() {
           <div className="mt-3 space-y-2">{form.diplomaDocuments.length?form.diplomaDocuments.map((d:DiplomaDoc,i:number)=><div key={`${d.university}-${i}`} className="rounded-xl border p-3"><p className="font-medium text-sm">{d.university}</p><p className="text-xs text-slate-500">{d.degree || 'Degree n/a'} · {d.graduated ? `Graduated: ${d.graduationYear || 'n/a'}` : `Expected: ${d.expectedGraduationYear || 'n/a'}`}</p><div className="mt-2 flex gap-2"><button type="button" className="rounded-md border px-2 py-1 text-xs" onClick={()=>{setDiplomaDraft(d);setEditingDiplomaIndex(i);}}>✏️ Edit</button><button type="button" className="rounded-md border border-red-200 px-2 py-1 text-xs text-red-600" onClick={()=>{if(window.confirm('Delete this diploma?')) setForm({...form, diplomaDocuments:form.diplomaDocuments.filter((_:unknown,idx:number)=>idx!==i)});}}>🗑 Delete</button>{d.fileDataUrl && <><button type="button" className="rounded-md border px-2 py-1 text-xs" onClick={()=>window.open(d.fileDataUrl,'_blank')}>View PDF</button><a className="rounded-md border px-2 py-1 text-xs" href={d.fileDataUrl} download={d.fileName}>Download PDF</a></>}</div></div>):<EmptyState text="No diplomas added yet." />}</div>
           </section>
 
+          <section className="card p-6"><h2 className="mb-4 text-lg font-semibold">Experience</h2><div className="grid gap-4 md:grid-cols-2">
+            <LabeledField label="Job Title"><input className="rounded-xl border px-3 py-2 text-sm" value={experienceDraft.jobTitle||''} onChange={(e)=>setExperienceDraft({...experienceDraft, jobTitle:e.target.value})} /></LabeledField>
+            <LabeledField label="Employment Type"><input className="rounded-xl border px-3 py-2 text-sm" value={experienceDraft.employmentType||''} onChange={(e)=>setExperienceDraft({...experienceDraft, employmentType:e.target.value})} /></LabeledField>
+            <LabeledField label="Company / Organization"><input className="rounded-xl border px-3 py-2 text-sm" value={experienceDraft.company||''} onChange={(e)=>setExperienceDraft({...experienceDraft, company:e.target.value})} /></LabeledField>
+            <LabeledField label="Location / Region"><input className="rounded-xl border px-3 py-2 text-sm" value={experienceDraft.location||''} onChange={(e)=>setExperienceDraft({...experienceDraft, location:e.target.value})} /></LabeledField>
+            <LabeledField label="Workplace Type"><select className="rounded-xl border px-3 py-2 text-sm" value={experienceDraft.workplaceType||'Remote'} onChange={(e)=>setExperienceDraft({...experienceDraft, workplaceType:e.target.value})}><option>On-site</option><option>Hybrid</option><option>Remote</option></select></LabeledField>
+            <LabeledField label="Currently Working Here"><input type="checkbox" checked={!!experienceDraft.currentlyWorking} onChange={(e)=>setExperienceDraft({...experienceDraft, currentlyWorking:e.target.checked})} /></LabeledField>
+            <LabeledField label="Start Month"><select className="rounded-xl border px-3 py-2 text-sm" value={experienceDraft.startMonth||''} onChange={(e)=>setExperienceDraft({...experienceDraft, startMonth:e.target.value})}><option value="">Month</option>{MONTHS.map((m)=><option key={m}>{m}</option>)}</select></LabeledField>
+            <LabeledField label="Start Year"><input className="rounded-xl border px-3 py-2 text-sm" value={experienceDraft.startYear||''} onChange={(e)=>setExperienceDraft({...experienceDraft, startYear:e.target.value})} placeholder="YYYY" /></LabeledField>
+            {!experienceDraft.currentlyWorking && <><LabeledField label="End Month"><select className="rounded-xl border px-3 py-2 text-sm" value={experienceDraft.endMonth||''} onChange={(e)=>setExperienceDraft({...experienceDraft, endMonth:e.target.value})}><option value="">Month</option>{MONTHS.map((m)=><option key={m}>{m}</option>)}</select></LabeledField><LabeledField label="End Year"><input className="rounded-xl border px-3 py-2 text-sm" value={experienceDraft.endYear||''} onChange={(e)=>setExperienceDraft({...experienceDraft, endYear:e.target.value})} placeholder="YYYY" /></LabeledField></>}
+            <LabeledField label="Description"><textarea className="min-h-32 rounded-xl border px-3 py-2 text-sm" value={experienceDraft.description||''} onChange={(e)=>setExperienceDraft({...experienceDraft, description:e.target.value})} /></LabeledField>
+          </div>
+          <button type="button" className="mt-3 rounded-lg border px-3 py-2 text-sm" onClick={()=>{ if(!experienceDraft.jobTitle) return setError('Job title is required.'); const list=[...form.experienceEntries]; if(editingExperienceIndex===null) list.push(experienceDraft); else list[editingExperienceIndex]=experienceDraft; setForm({...form, experienceEntries:list}); setExperienceDraft({jobTitle:'', currentlyWorking:true, workplaceType:'Remote'}); setEditingExperienceIndex(null); }}>{editingExperienceIndex===null?'Add experience':'Save experience changes'}</button>
+          <div className="mt-3 space-y-2">{form.experienceEntries.length?form.experienceEntries.map((x:ExperienceEntry,i:number)=><div key={`${x.jobTitle}-${i}`} className="rounded-xl border p-3"><p className="font-medium text-sm">{x.jobTitle}</p><p className="text-xs text-slate-500">{x.company || 'Company n/a'} · {x.employmentType || 'Employment n/a'} · {x.workplaceType || 'Remote'}</p><p className="text-xs text-slate-500">{x.startMonth || ''} {x.startYear || ''} - {x.currentlyWorking ? 'Present' : `${x.endMonth || ''} ${x.endYear || ''}`}</p><p className="mt-1 text-xs text-slate-600">{x.description || 'No description'}</p><div className="mt-2 flex gap-2"><button type="button" className="rounded-md border px-2 py-1 text-xs" onClick={()=>{setExperienceDraft(x);setEditingExperienceIndex(i);}}>✏️ Edit</button><button type="button" className="rounded-md border border-red-200 px-2 py-1 text-xs text-red-600" onClick={()=>{if(window.confirm('Delete this experience entry?')) setForm({...form, experienceEntries:form.experienceEntries.filter((_:unknown,idx:number)=>idx!==i)});}}>🗑 Delete</button></div></div>):<EmptyState text="No experience entries yet." />}</div>
+          </section>
+
           <section className="card p-6"><h2 className="mb-4 text-lg font-semibold">Additional Information</h2><div className="grid gap-4 md:grid-cols-2">
             <LabeledField label="Professional Headline"><input className="rounded-xl border px-3 py-2 text-sm" value={form.headline} onChange={(e)=>setForm({...form, headline:e.target.value})} /></LabeledField>
             <LabeledField label="Preferred Roles"><input className="rounded-xl border px-3 py-2 text-sm" value={form.preferredRoles} onChange={(e)=>setForm({...form, preferredRoles:e.target.value})} /></LabeledField>
             <LabeledField label="About"><textarea className="min-h-28 rounded-xl border px-3 py-2 text-sm" value={form.about} onChange={(e)=>setForm({...form, about:e.target.value})} /></LabeledField>
             <LabeledField label="Experience"><textarea className="min-h-28 rounded-xl border px-3 py-2 text-sm" value={form.experience} onChange={(e)=>setForm({...form, experience:e.target.value})} /></LabeledField>
             <LabeledField label="Projects"><textarea className="min-h-28 rounded-xl border px-3 py-2 text-sm" value={form.projects} onChange={(e)=>setForm({...form, projects:e.target.value})} /></LabeledField>
-            <LabeledField label="Languages"><div className="rounded-xl border p-3"><div className="flex flex-wrap gap-2">{(form.languageSelections||[]).map((lang:string)=><span key={lang} className="rounded-full bg-slate-100 px-2 py-1 text-xs">{lang}</span>)}</div><div className="mt-2 flex flex-wrap gap-1">{LANGUAGE_OPTIONS.map((lang)=><button key={lang} type="button" className="rounded-full border px-2 py-0.5 text-xs" onClick={()=>{if((form.languageSelections||[]).includes(lang)) return; setForm({...form, languageSelections:[...(form.languageSelections||[]), lang]});}}>{lang}</button>)}</div></div></LabeledField>
+            <LabeledField label="Languages">
+              <div className="rounded-xl border p-3">
+                <input
+                  className="w-full rounded-lg border px-3 py-2 text-sm"
+                  placeholder="Search languages"
+                  value={languageQuery}
+                  onChange={(e) => setLanguageQuery(e.target.value)}
+                />
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {(form.languageSelections || []).map((lang: string) => (
+                    <span key={lang} className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-1 text-xs">
+                      {lang}
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setForm({
+                            ...form,
+                            languageSelections: (form.languageSelections || []).filter((x: string) => x !== lang)
+                          })
+                        }
+                      >
+                        ×
+                      </button>
+                    </span>
+                  ))}
+                </div>
+                <div className="mt-2 max-h-28 space-y-1 overflow-auto">
+                  {LANGUAGE_OPTIONS.filter((lang) => lang.toLowerCase().includes(languageQuery.toLowerCase())).map((lang) => (
+                    <button
+                      key={lang}
+                      type="button"
+                      className="block w-full rounded px-2 py-1 text-left text-xs hover:bg-slate-50"
+                      onClick={() => {
+                        if ((form.languageSelections || []).includes(lang)) return;
+                        setForm({ ...form, languageSelections: [...(form.languageSelections || []), lang] });
+                      }}
+                    >
+                      {lang}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </LabeledField>
             <LabeledField label="Achievements"><textarea className="min-h-28 rounded-xl border px-3 py-2 text-sm" value={form.achievements} onChange={(e)=>setForm({...form, achievements:e.target.value})} /></LabeledField>
             <LabeledField label="Volunteering"><textarea className="min-h-28 rounded-xl border px-3 py-2 text-sm" value={form.volunteering} onChange={(e)=>setForm({...form, volunteering:e.target.value})} /></LabeledField>
           </div></section>
@@ -369,6 +449,7 @@ export default function StudentProfilePage() {
           <section className="card p-6"><h2 className="text-lg font-semibold">Certificates</h2>{form.certificateDocuments.length ? form.certificateDocuments.map((x:CertificateDoc,i:number)=><div key={i} className="mt-3 rounded-xl border p-3"><p className="font-medium text-sm">{x.name}</p><p className="text-xs text-slate-500">{x.issuer || 'Issuer n/a'} · Issue: {formatEnglishDate(x.issueDate)} · Expiration: {x.doesNotExpire ? 'Does not expire' : formatEnglishDate(x.expirationDate)}</p><p className="mt-1 text-xs text-slate-600">{x.description || 'No description'}</p><p className="mt-1 text-xs">PDF: {x.fileName}</p>{x.fileDataUrl && <div className="mt-2 flex gap-2"><button type="button" className="rounded-md border px-2 py-1 text-xs" onClick={()=>window.open(x.fileDataUrl, '_blank')}>View PDF</button><a className="rounded-md border px-2 py-1 text-xs" href={x.fileDataUrl} download={x.fileName}>Download PDF</a></div>}</div>) : <EmptyState text="No certificates yet." />}</section>
           <section className="card p-6"><h2 className="text-lg font-semibold">Diplomas</h2>{form.diplomaDocuments.length ? form.diplomaDocuments.map((x:DiplomaDoc,i:number)=><div key={i} className="mt-3 rounded-xl border p-3"><p className="font-medium text-sm">{x.university}</p><p className="text-xs text-slate-500">{x.degree || 'Degree n/a'} · {x.graduated ? `Graduated: ${x.graduationYear || 'n/a'}` : `Expected: ${x.expectedGraduationYear || 'n/a'}`}</p>{x.fileDataUrl && <div className="mt-2 flex gap-2"><button type="button" className="rounded-md border px-2 py-1 text-xs" onClick={()=>window.open(x.fileDataUrl, '_blank')}>View PDF</button><a className="rounded-md border px-2 py-1 text-xs" href={x.fileDataUrl} download={x.fileName}>Download PDF</a></div>}</div>) : <EmptyState text="No diplomas yet." />}</section>
           <section className="card p-6"><h2 className="text-lg font-semibold">Projects</h2><p className="mt-2 text-sm text-slate-600">{form.projects || 'No projects information yet.'}</p></section>
+          <section className="card p-6"><h2 className="text-lg font-semibold">Experience</h2>{form.experienceEntries.length ? form.experienceEntries.map((x:ExperienceEntry,i:number)=><div key={i} className="mt-3 rounded-xl border p-3"><p className="font-medium text-sm">{x.jobTitle}</p><p className="text-xs text-slate-500">{x.company || 'Company n/a'} · {x.employmentType || 'Employment n/a'} · {x.workplaceType || 'Remote'}</p><p className="text-xs text-slate-500">{x.startMonth || ''} {x.startYear || ''} - {x.currentlyWorking ? 'Present' : `${x.endMonth || ''} ${x.endYear || ''}`}</p><p className="mt-1 text-xs text-slate-600">{x.description || 'No description'}</p></div>) : <EmptyState text="No experience entries yet." />}</section>
           <section className="card p-6"><h2 className="text-lg font-semibold">Languages</h2><div className="mt-2 flex flex-wrap gap-2">{(form.languageSelections||[]).length ? form.languageSelections.map((x:string)=><span key={x} className="rounded-full bg-slate-100 px-2 py-1 text-xs">{x}</span>) : <EmptyState text="No languages yet." />}</div></section>
           <section className="card p-6"><h2 className="text-lg font-semibold">Achievements</h2><p className="mt-2 text-sm text-slate-600">{form.achievements || 'No achievements yet.'}</p></section>
           <section className="card p-6"><h2 className="text-lg font-semibold">Volunteering</h2><p className="mt-2 text-sm text-slate-600">{form.volunteering || 'No volunteering details yet.'}</p></section>
