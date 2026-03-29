@@ -35,10 +35,10 @@ export const dynamic = 'force-dynamic';
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json().catch(() => ({}));
-    const mlApiUrl = process.env.ML_API_URL;
-    console.log('ML_API_URL =', mlApiUrl || 'undefined');
+    const ML_API_URL = process.env.ML_API_URL;
+    console.log('ML_API_URL =', ML_API_URL || 'undefined');
     console.log('Using fallback demo engine: disabled');
-    if (!mlApiUrl) {
+    if (!ML_API_URL) {
       return NextResponse.json({ error: 'ML_API_URL is not configured' }, { status: 500 });
     }
 
@@ -61,7 +61,7 @@ export async function POST(req: NextRequest) {
 
     const missing = getProfileCompletionHints(profile);
     console.log('Calling HF model...');
-    const startRes = await fetch(`${mlApiUrl}/gradio_api/call/gradio_recommend`, {
+    const startRes = await fetch(`${ML_API_URL}/gradio_api/call/gradio_recommend`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -90,7 +90,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'No event_id returned from Gradio', details: startData }, { status: 500 });
     }
 
-    const resultUrl = `${mlApiUrl}/gradio_api/call/gradio_recommend/${eventId}`;
+    const resultUrl = `${ML_API_URL}/gradio_api/call/gradio_recommend/${eventId}`;
     for (let i = 0; i < 20; i++) {
       await sleep(1500);
       const resultRes = await fetch(resultUrl, { method: 'GET', cache: 'no-store' });
