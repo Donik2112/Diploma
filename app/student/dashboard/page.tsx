@@ -25,6 +25,7 @@ export default function StudentDashboard() {
   });
   const [applyStatus, setApplyStatus] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
+  const [insights, setInsights] = useState<string[]>([]);
 
   useEffect(() => {
     (async () => {
@@ -50,6 +51,35 @@ export default function StudentDashboard() {
         setRecommendSource(recData?.source || recData?.data?.source || 'ML API');
         const warnings = recData?.warnings || recData?.data?.warnings || [];
         setRecommendWarning(Array.isArray(warnings) && warnings.length ? String(warnings[0]) : '');
+
+        const [improveRes, rolesRes] = await Promise.all([
+          fetch('/api/assistant', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'profile_improvement' }),
+          }),
+          fetch('/api/assistant', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'best_roles' }),
+          }),
+        ]);
+
+        const improveData = await improveRes.json().catch(() => ({}));
+        const rolesData = await rolesRes.json().catch(() => ({}));
+
+        const suggestion = [
+          improveData?.answer,
+          rolesData?.answer,
+          profileData?.data?.completion
+            ? `Your profile completeness is ${Number(profileData.data.completion)}%. Complete missing sections to improve recommendation quality.`
+            : '',
+        ]
+          .map((v) => String(v || '').trim())
+          .filter(Boolean)
+          .slice(0, 3);
+
+        setInsights(suggestion);
       } finally {
         setLoading(false);
       }
@@ -224,9 +254,10 @@ export default function StudentDashboard() {
           <div className="card p-6">
             <h3 className="text-lg font-semibold text-slate-900">AI insights</h3>
             <ul className="mt-3 space-y-2 text-sm text-slate-600">
-              <li className="rounded-xl bg-slate-50 p-3">Add 2 portfolio cases to increase profile conversion by ~24%.</li>
-              <li className="rounded-xl bg-slate-50 p-3">Projects with React + API integration currently have strong demand.</li>
-              <li className="rounded-xl bg-slate-50 p-3">Reply within 12 hours to improve acceptance probability.</li>
+              {insights.map((item, idx) => (
+                <li key={`${idx}-${item.slice(0, 24)}`} className="rounded-xl bg-slate-50 p-3">{item}</li>
+              ))}
+              {!insights.length && <li className="rounded-xl bg-slate-50 p-3">AI insights are loading...</li>}
             </ul>
           </div>
           <div className="card p-6">

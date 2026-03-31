@@ -24,6 +24,8 @@ export default function ProjectsPage() {
   const [rows, setRows] = useState<Project[]>([]);
   const [saved, setSaved] = useState<Record<string, boolean>>({});
   const [loading, setLoading] = useState(false);
+  const [assistantCard, setAssistantCard] = useState<Record<string, string>>({});
+  const [assistantLoading, setAssistantLoading] = useState<Record<string, boolean>>({});
   const [form, setForm] = useState({
     q: '',
     category: '',
@@ -46,6 +48,22 @@ export default function ProjectsPage() {
   }
 
   useEffect(() => { load(); }, []);
+
+
+  async function explainRecommendation(projectId: string) {
+    setAssistantLoading((prev) => ({ ...prev, [projectId]: true }));
+    try {
+      const res = await fetch('/api/assistant', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'why_recommended', projectId }),
+      });
+      const payload = await res.json();
+      setAssistantCard((prev) => ({ ...prev, [projectId]: res.ok ? String(payload?.answer || 'No answer.') : String(payload?.error || 'Assistant error.') }));
+    } finally {
+      setAssistantLoading((prev) => ({ ...prev, [projectId]: false }));
+    }
+  }
 
   const quickStats = useMemo(() => {
     const total = rows.length;
@@ -163,12 +181,22 @@ export default function ProjectsPage() {
                     <span className="status-pill bg-blue-100 text-blue-700">Recommended for your profile</span>
                   </div>
                   <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => explainRecommendation(p._id)}
+                      className="btn-secondary"
+                      disabled={assistantLoading[p._id]}
+                    >
+                      {assistantLoading[p._id] ? 'Loading...' : 'Why recommended?'}
+                    </button>
                     <button onClick={() => setSaved((prev) => ({ ...prev, [p._id]: !prev[p._id] }))} className="btn-secondary">
                       {saved[p._id] ? 'Saved' : 'Save'}
                     </button>
                     <Link href={`/projects/${p._id}`} className="btn-primary">View details</Link>
                   </div>
                 </div>
+                {assistantCard[p._id] && (
+                  <p className="mt-3 rounded-xl bg-blue-50 p-3 text-sm text-slate-700">{assistantCard[p._id]}</p>
+                )}
               </article>
             );
           })}
