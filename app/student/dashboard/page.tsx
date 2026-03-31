@@ -8,6 +8,7 @@ import {
   getScoreRange,
   JobRecommendation,
   scoreToPercent,
+  toEnglishRecommendationText,
   trimDescription,
 } from '@/lib/jobRecommendations';
 import { ProfileReadiness } from '@/lib/profileReadiness';
@@ -202,11 +203,20 @@ export default function StudentDashboard() {
                     <div>
                       <p className="font-semibold text-slate-900">{rec.title || rec.job_title || `Recommendation #${idx + 1}`}</p>
                       <p className="mt-1 text-sm text-slate-600">
-                        {trimDescription(rec.match_reason || 'Match explanation is not available yet.', 120)}
+                        {trimDescription(toEnglishRecommendationText(rec), 120)}
                       </p>
                       <p className="mt-1 text-xs text-slate-500">
-                        {rec.city || 'Remote/Not specified'} · {rec.employment_type || 'Employment n/a'} · {rec.experience_level || 'Experience n/a'}
+                        {rec.city || 'Remote/Not specified'} · {rec.employment_type || 'Employment n/a'} · {rec.experience_level || 'Experience n/a'} · Salary: {rec.salary || `${rec.budget_min ?? 0}-${rec.budget_max ?? 0}`}
                       </p>
+
+                      {Array.isArray(rec.matched_skills) && rec.matched_skills.length > 0 && (
+                        <div className="mt-2 flex flex-wrap gap-1">
+                          {rec.matched_skills.slice(0, 4).map((skill: string) => (
+                            <span key={`${rec.project_id}-${skill}`} className="rounded-full border border-slate-200 px-2 py-0.5 text-[11px] text-slate-600">{skill}</span>
+                          ))}
+                        </div>
+                      )}
+
                       <div className="mt-2 flex flex-wrap items-center gap-2">
                         {rec.project_id ? (
                           <Link
@@ -251,8 +261,8 @@ export default function StudentDashboard() {
           ) : (
             <div className="mt-5 rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-6 text-center">
               <p className="text-2xl">✨</p>
-              <p className="mt-2 font-semibold text-slate-900">No recommendations yet</p>
-              <p className="mt-1 text-sm text-slate-600">Complete your profile and add skills to unlock better matches.</p>
+              <p className="mt-2 font-semibold text-slate-900">No strong recommendations yet</p>
+              <p className="mt-1 text-sm text-slate-600">We filtered out low-confidence matches. Add more role-specific skills and portfolio evidence, then refresh recommendations.</p>
             </div>
           )}
         </div>

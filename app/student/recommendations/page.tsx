@@ -5,9 +5,11 @@ import Link from 'next/link';
 import {
   canRenderMatchPercent,
   extractRecommendations,
+  extractSecondaryRecommendations,
   getScoreRange,
   JobRecommendation,
   scoreToPercent,
+  toEnglishRecommendationText,
   trimDescription,
 } from '@/lib/jobRecommendations';
 import { ProfileReadiness } from '@/lib/profileReadiness';
@@ -15,6 +17,7 @@ import { ProfileReadiness } from '@/lib/profileReadiness';
 export default function RecommendationsPage() {
   const [items, setItems] = useState<JobRecommendation[]>([]);
   const [source, setSource] = useState('Loading...');
+  const [secondaryItems, setSecondaryItems] = useState<JobRecommendation[]>([]);
   const [warning, setWarning] = useState('');
   const [error, setError] = useState('');
   const [sort, setSort] = useState<'match' | 'title'>('match');
@@ -35,6 +38,7 @@ export default function RecommendationsPage() {
       .then((payload) => {
         if (payload?.error) throw new Error(payload.error);
         setItems(extractRecommendations(payload));
+        setSecondaryItems(extractSecondaryRecommendations(payload));
         setSource(payload?.source || payload?.data?.source || 'ML API');
         if (payload?.profileReadiness) {
           setProfileReadiness(payload.profileReadiness);
@@ -45,7 +49,7 @@ export default function RecommendationsPage() {
       .catch((err: any) => {
         console.error('RECOMMENDATIONS PAGE ERROR:', err);
         setError(err?.message || 'Could not load recommendations');
-        setSource('ML API');
+        setSource('Request failed');
       });
   }, []);
 
@@ -161,7 +165,7 @@ export default function RecommendationsPage() {
                   ? 'Preliminary'
                   : profileReadiness.recommendationMode === 'blocked'
                     ? 'Profile incomplete'
-                    : 'Low-confidence match'}
+                    : 'Confidence estimate'}
               </span>
             )}
           </div>
@@ -186,8 +190,17 @@ export default function RecommendationsPage() {
             Family: <span className="font-medium text-slate-700">{i.predicted_family || 'Not specified'}</span>
           </p>
           <p className="mt-2 rounded bg-slate-50 p-2 text-xs text-slate-600">
-            {trimDescription(i.match_reason || 'Match explanation is not available yet.', 180)}
+            {trimDescription(toEnglishRecommendationText(i), 180)}
           </p>
+
+          {Array.isArray(i.matched_skills) && i.matched_skills.length > 0 && (
+            <div className="mt-2 flex flex-wrap gap-1">
+              {i.matched_skills.slice(0, 5).map((skill) => (
+                <span key={`${i.project_id}-${skill}`} className="rounded-full border border-slate-200 px-2 py-0.5 text-[11px] text-slate-600">{skill}</span>
+              ))}
+            </div>
+          )}
+
           <div className="mt-3 flex flex-wrap items-center gap-2">
             {i.project_id ? (
               <Link
@@ -224,6 +237,23 @@ export default function RecommendationsPage() {
           )}
         </div>
       ))}
+
+
+      {profileReadiness.recommendationMode !== 'blocked' && secondaryItems.length > 0 && (
+        <div className="card p-4">
+          <h3 className="text-lg font-semibold text-slate-900">Suggested internal projects</h3>
+          <p className="mt-1 text-sm text-slate-600">These are lower-confidence alternatives, shown as secondary options.</p>
+          <div className="mt-3 space-y-2">
+            {secondaryItems.slice(0, 3).map((i, idx) => (
+              <div key={`secondary-${i.project_id || idx}`} className="rounded-lg border border-slate-200 p-3 text-sm text-slate-700">
+                <p className="font-semibold">{i.title || i.job_title || 'Project suggestion'}</p>
+                <p className="text-xs text-slate-500">{i.city || 'City n/a'} · {i.experience_level || 'Experience n/a'} · {i.employment_type || 'Employment n/a'}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }
