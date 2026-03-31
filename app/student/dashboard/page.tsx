@@ -97,6 +97,12 @@ export default function StudentDashboard() {
     profileReadiness.recommendationMode === 'ready' &&
     canRenderMatchPercent(minScore, maxScore);
 
+
+  const openAssistant = (action?: 'profile_improvement' | 'best_roles') => {
+    if (typeof window === 'undefined') return;
+    window.dispatchEvent(new CustomEvent('uniwork-ai-open', { detail: { action } }));
+  };
+
   const applyToProject = async (projectId?: string) => {
     if (!projectId) return;
     setApplyStatus((prev) => ({ ...prev, [projectId]: 'Submitting...' }));
@@ -139,6 +145,7 @@ export default function StudentDashboard() {
         <div className="mt-5 flex flex-wrap gap-3">
           <Link href="/projects" className="btn-primary">Browse projects</Link>
           <Link href="/student/profile" className="btn-secondary">Update profile</Link>
+          <button type="button" onClick={() => openAssistant()} className="btn-secondary">Ask AI</button>
         </div>
       </section>
 

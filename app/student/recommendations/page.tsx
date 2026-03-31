@@ -67,6 +67,11 @@ export default function RecommendationsPage() {
     profileReadiness.recommendationMode === 'ready' &&
     canRenderMatchPercent(minScore, maxScore);
 
+  const openAssistant = (projectId?: string, action?: 'why_recommended' | 'vacancy_analysis' | 'cover_letter' | 'best_roles' | 'profile_improvement') => {
+    if (typeof window === 'undefined') return;
+    window.dispatchEvent(new CustomEvent('uniwork-ai-open', { detail: { projectId, action } }));
+  };
+
   const applyToProject = async (projectId?: string) => {
     if (!projectId) return;
     setApplyStatus((prev) => ({ ...prev, [projectId]: 'Submitting...' }));
@@ -103,6 +108,7 @@ export default function RecommendationsPage() {
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-3xl font-bold">Recommended Projects</h1>
+        <button type="button" onClick={() => openAssistant(undefined, 'best_roles')} className="btn-secondary">AI Assistant</button>
         <select className="rounded px-3 py-1 border" value={sort} onChange={(e) => setSort(e.target.value as any)}>
           <option value="match">Sort by match score</option>
           <option value="title">Sort by title</option>
@@ -209,6 +215,9 @@ export default function RecommendationsPage() {
             >
               Apply now
             </button>
+            <button type="button" onClick={() => openAssistant(i.project_id, 'why_recommended')} disabled={!i.project_id} className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 disabled:text-slate-400">Why recommended?</button>
+            <button type="button" onClick={() => openAssistant(i.project_id, 'vacancy_analysis')} disabled={!i.project_id} className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 disabled:text-slate-400">Analyze with AI</button>
+            <button type="button" onClick={() => openAssistant(i.project_id, 'cover_letter')} disabled={!i.project_id} className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 disabled:text-slate-400">Generate cover letter</button>
           </div>
           {i.project_id && applyStatus[i.project_id] && (
             <p className="mt-2 text-xs text-slate-500">{applyStatus[i.project_id]}</p>

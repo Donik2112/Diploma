@@ -50,6 +50,11 @@ export default function ProjectsPage() {
   useEffect(() => { load(); }, []);
 
 
+  const openAssistant = (projectId?: string, action?: 'why_recommended' | 'vacancy_analysis' | 'cover_letter') => {
+    if (typeof window === 'undefined') return;
+    window.dispatchEvent(new CustomEvent('uniwork-ai-open', { detail: { projectId, action } }));
+  };
+
   async function explainRecommendation(projectId: string) {
     setAssistantLoading((prev) => ({ ...prev, [projectId]: true }));
     try {
@@ -88,6 +93,7 @@ export default function ProjectsPage() {
             <p className="text-sm text-slate-500">Results</p>
             <p className="text-3xl font-semibold text-slate-900">{quickStats.total}</p>
             <p className="text-xs text-slate-500">Avg budget: ${quickStats.avgBudget || 0}</p>
+            <button type="button" onClick={() => openAssistant()} className="btn-secondary mt-2">AI Assistant</button>
           </div>
         </div>
       </section>
@@ -188,6 +194,8 @@ export default function ProjectsPage() {
                     >
                       {assistantLoading[p._id] ? 'Loading...' : 'Why recommended?'}
                     </button>
+                    <button type="button" onClick={() => openAssistant(p._id, 'vacancy_analysis')} className="btn-secondary">Analyze with AI</button>
+                    <button type="button" onClick={() => openAssistant(p._id, 'cover_letter')} className="btn-secondary">Generate cover letter</button>
                     <button onClick={() => setSaved((prev) => ({ ...prev, [p._id]: !prev[p._id] }))} className="btn-secondary">
                       {saved[p._id] ? 'Saved' : 'Save'}
                     </button>

@@ -9,6 +9,13 @@ import { calculateProfileCompleteness } from '@/lib/profileReadiness';
 
 export const dynamic = 'force-dynamic';
 
+type AssistantAction =
+  | 'why_recommended'
+  | 'profile_improvement'
+  | 'best_roles'
+  | 'vacancy_analysis'
+  | 'cover_letter';
+
 const requestSchema = z.object({
   action: z.enum([
     'why_recommended',
@@ -54,7 +61,7 @@ function recommendationScore(profile: any, project: any) {
   return matchedSkills * 3 + cityBonus + levelBonus;
 }
 
-function inferBestRoles(projects: any[]) {
+function rankedCategories(projects: any[]) {
   const count: Record<string, number> = {};
   projects.forEach((p) => {
     const key = String(p?.category || 'General');
@@ -63,8 +70,11 @@ function inferBestRoles(projects: any[]) {
 
   return Object.entries(count)
     .sort((a, b) => b[1] - a[1])
-    .slice(0, 3)
-    .map(([role]) => role);
+    .slice(0, 3);
+}
+
+function requireProjectForAction(action: AssistantAction) {
+  return action === 'why_recommended' || action === 'vacancy_analysis' || action === 'cover_letter';
 }
 
 export async function POST(req: NextRequest) {
@@ -89,16 +99,21 @@ export async function POST(req: NextRequest) {
 
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
+    const { action, projectId } = parsed.data;
+
     if (!profile) {
       return NextResponse.json({
         answer:
-          'Your student profile is not complete yet. Please fill in your skills, city, and experience level so I can provide better recommendations.',
+          'Your profile is incomplete. Add skills, interests, city, and experience level first so I can provide recommendation-aware guidance.',
         profileCompleteness: 0,
-        action: parsed.data.action,
+        action,
       });
     }
 
-    const { action, projectId } = parsed.data;
+    if (requireProjectForAction(action) && !projectId) {
+      return NextResponse.json({ error: `projectId is required for ${action}` }, { status: 400 });
+    }
+
     const studentSkills = normalizeList(profile.skills);
     const studentInterests = normalizeList(profile.interests);
     const completeness = calculateProfileCompleteness(profile as any);
@@ -114,7 +129,7 @@ export async function POST(req: NextRequest) {
         createdAt: 1,
       })
       .sort({ createdAt: -1 })
-      .limit(30)
+      .limit(40)
       .lean();
 
     const rankedProjects = topProjects
@@ -126,7 +141,7 @@ export async function POST(req: NextRequest) {
     if (projectId) {
       const selectedRaw = await Project.findById(projectId).lean();
       selectedProject = Array.isArray(selectedRaw) ? selectedRaw[0] : selectedRaw;
-      if (!selectedProject && (action === 'why_recommended' || action === 'vacancy_analysis' || action === 'cover_letter')) {
+      if (!selectedProject && requireProjectForAction(action)) {
         return NextResponse.json({ error: 'Project not found' }, { status: 404 });
       }
     }
@@ -135,25 +150,62 @@ export async function POST(req: NextRequest) {
 
     if (action === 'profile_improvement') {
       const suggestions: string[] = [];
+      const weakAreas: string[] = [];
 
-      if (!profile.bio) suggestions.push('add a short professional bio');
-      if (!profile.about) suggestions.push('describe your project experience and preferred project types');
-      if (!studentSkills.length) suggestions.push('add technical skills relevant to your target roles');
-      if (!studentInterests.length) suggestions.push('add your professional interests');
-      if (!normalizeList(profile.portfolioLinks).length) suggestions.push('add 1-2 portfolio links');
-      if (!profile.githubUrl) suggestions.push('add your GitHub profile link');
-      if (!profile.linkedinUrl) suggestions.push('add your LinkedIn profile link');
+      if (!profile.bio || String(profile.bio).trim().length < 60) {
+        weakAreas.push('short bio');
+        suggestions.push('write a 2-3 sentence bio focused on your strongest stack and target role');
+      }
+      if (!profile.about || String(profile.about).trim().length < 180) {
+        weakAreas.push('about section');
+        suggestions.push('expand the “About” section with concrete project outcomes and responsibilities');
+      }
+      if (studentSkills.length < 6) {
+        weakAreas.push('skills depth');
+        suggestions.push('add 4-6 role-specific skills (for example SQL, Power BI, dashboarding, API integration, testing)');
+      }
+      if (!studentInterests.length) {
+        weakAreas.push('interests');
+        suggestions.push('add interests so recommendation ranking can better prioritize role families');
+      }
+      if (!normalizeList(profile.portfolioLinks).length) {
+        weakAreas.push('portfolio evidence');
+        suggestions.push('add at least 2 portfolio links with short descriptions of your contribution');
+      }
+      if (!profile.githubUrl) suggestions.push('add a GitHub link with pinned repositories relevant to your target role');
+      if (!profile.linkedinUrl) suggestions.push('add a LinkedIn link with updated headline and experience summary');
+      if (!profile.experienceLevel) suggestions.push('set your experience level to improve fit filtering for matching projects');
+      if (!profile.city) suggestions.push('set city or remote preference to improve location-aware ranking');
 
-      answer = suggestions.length
-        ? `Your current profile completion is ${completeness}%. To improve recommendation quality, ${suggestions.join(', ')}.`
-        : 'Your profile is already strong. Keep your skills and portfolio updated to maintain recommendation quality.';
+      if (!suggestions.length) {
+        suggestions.push('refresh your top 5 skills every month based on target vacancies');
+        suggestions.push('attach one new portfolio case with measurable impact (time saved, accuracy improved, etc.)');
+        suggestions.push('tailor your profile headline to the main role direction you want this semester');
+      }
+
+      answer = `Profile completeness: ${completeness}%. ${
+        weakAreas.length
+          ? `Main weak sections: ${weakAreas.join(', ')}. `
+          : 'Your profile is complete, so focus on optimization. '
+      }Priority improvements: ${suggestions.slice(0, 4).join('; ')}.`;
     }
 
     if (action === 'best_roles') {
-      const bestRoles = inferBestRoles(rankedProjects.slice(0, 10));
-      answer = bestRoles.length
-        ? `Based on your profile and current matching projects, the most suitable directions are: ${bestRoles.join(', ')}.`
-        : 'I do not have enough data yet to identify your strongest role directions. Add more skills and profile details.';
+      const top = rankedCategories(rankedProjects.slice(0, 15));
+      const topSkills = studentSkills.slice(0, 6);
+
+      if (!top.length) {
+        answer =
+          'I do not have enough project pattern data to rank your best-fit role directions yet. Add skills and refresh recommendations.';
+      } else {
+        const roleText = top
+          .map(([role, count], idx) => `${idx + 1}) ${role} (${count} matching projects)`)
+          .join('; ');
+        answer =
+          `Best-fit role directions: ${roleText}. ` +
+          `Why this fit: these categories appear most often among projects that match your current profile signals (skills, city, and experience level). ` +
+          (topSkills.length ? `Your strongest profile signals now: ${topSkills.join(', ')}.` : 'Add more explicit skills to improve role precision.');
+      }
     }
 
     if (action === 'why_recommended') {
@@ -164,16 +216,16 @@ export async function POST(req: NextRequest) {
       const matchedSkills = overlap(studentSkills, projectSkills);
 
       answer =
-        'This project is recommended because it aligns with your profile. ' +
+        `Recommendation explanation for "${selectedProject.title}": ` +
         (matchedSkills.length
-          ? `Your matching skills include ${matchedSkills.join(', ')}. `
-          : 'It is relevant to your interests and recommendation context. ') +
+          ? `skill overlap found (${matchedSkills.join(', ')}). `
+          : 'no direct skill overlap found, but the project still aligns with broader profile signals. ') +
         (profile.city && selectedProject.city
-          ? `The location (${selectedProject.city}) is compatible with your city preference. `
-          : '') +
-        (profile.experienceLevel
-          ? `Your current experience level (${profile.experienceLevel}) is considered in match ranking.`
-          : '');
+          ? `Location alignment: your city preference and project city (${selectedProject.city}) are compatible. `
+          : 'Location signal is neutral. ') +
+        (profile.experienceLevel && selectedProject.experienceLevel
+          ? `Experience alignment: profile ${profile.experienceLevel} vs project ${selectedProject.experienceLevel}.`
+          : 'Experience alignment is estimated from available profile/project data.');
     }
 
     if (action === 'vacancy_analysis') {
@@ -187,13 +239,20 @@ export async function POST(req: NextRequest) {
         (skill) => !studentSkills.map((x) => x.toLowerCase()).includes(skill.toLowerCase())
       );
 
+      const fitLevel = matchedSkills.length >= 4 ? 'High' : matchedSkills.length >= 2 ? 'Medium' : 'Low';
+      const finalRecommendation =
+        fitLevel === 'High'
+          ? 'Apply now. You already meet the core requirements.'
+          : fitLevel === 'Medium'
+            ? 'Apply with a focused cover letter and highlight related portfolio evidence.'
+            : 'Consider applying only after improving the missing core skills.';
+
       answer =
-        `This vacancy appears ${matchedSkills.length >= 2 ? 'well aligned' : 'partially aligned'} with your current profile. ` +
-        (matchedSkills.length ? `You already match: ${matchedSkills.join(', ')}. ` : '') +
-        (missingSkills.length
-          ? `To improve your application, strengthen: ${missingSkills.slice(0, 3).join(', ')}. `
-          : '') +
-        `Category fit: ${selectedProject.category || 'General'}.`;
+        `Vacancy analysis for "${selectedProject.title}": ` +
+        `1) Fit level: ${fitLevel}. ` +
+        `2) Matched skills: ${matchedSkills.length ? matchedSkills.join(', ') : 'none explicitly matched'}. ` +
+        `3) Missing skills: ${missingSkills.length ? missingSkills.slice(0, 5).join(', ') : 'no critical gaps identified'}. ` +
+        `4) Recommendation: ${finalRecommendation}`;
     }
 
     if (action === 'cover_letter') {
@@ -203,14 +262,15 @@ export async function POST(req: NextRequest) {
 
       const projectSkills = normalizeList(selectedProject.requiredSkills);
       const matchedSkills = overlap(studentSkills, projectSkills);
+      const introSkills = studentSkills.slice(0, 4).join(', ') || 'relevant technical skills';
 
-      answer = `Hello, I am interested in your project "${selectedProject.title}". My background includes ${studentSkills
-        .slice(0, 5)
-        .join(', ')}. ${
-        matchedSkills.length
-          ? `I am a strong fit because my skills match your requirements, including ${matchedSkills.join(', ')}.`
-          : 'I am ready to contribute and quickly adapt to your project requirements.'
-      } I would be glad to discuss project details and timeline.`;
+      answer =
+        `Hello, I am interested in the project "${selectedProject.title}". ` +
+        `My background includes ${introSkills}, and I have practical experience with student and freelance-style delivery. ` +
+        (matchedSkills.length
+          ? `My profile aligns with your requirements, especially ${matchedSkills.slice(0, 3).join(', ')}. `
+          : 'I can quickly adapt to your stack and project workflow. ') +
+        `I can provide clear communication, structured milestones, and timely delivery. I would be glad to discuss scope and timeline.`;
     }
 
     return NextResponse.json({ answer, profileCompleteness: completeness, action });
