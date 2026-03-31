@@ -5,9 +5,11 @@ import Link from 'next/link';
 import {
   canRenderMatchPercent,
   extractRecommendations,
+  extractSecondaryRecommendations,
   getScoreRange,
   JobRecommendation,
   scoreToPercent,
+  toEnglishRecommendationText,
   trimDescription,
 } from '@/lib/jobRecommendations';
 import { ProfileReadiness } from '@/lib/profileReadiness';
@@ -15,6 +17,7 @@ import { ProfileReadiness } from '@/lib/profileReadiness';
 export default function RecommendationsPage() {
   const [items, setItems] = useState<JobRecommendation[]>([]);
   const [source, setSource] = useState('Loading...');
+  const [secondaryItems, setSecondaryItems] = useState<JobRecommendation[]>([]);
   const [warning, setWarning] = useState('');
   const [error, setError] = useState('');
   const [sort, setSort] = useState<'match' | 'title'>('match');
@@ -35,6 +38,7 @@ export default function RecommendationsPage() {
       .then((payload) => {
         if (payload?.error) throw new Error(payload.error);
         setItems(extractRecommendations(payload));
+        setSecondaryItems(extractSecondaryRecommendations(payload));
         setSource(payload?.source || payload?.data?.source || 'ML API');
         if (payload?.profileReadiness) {
           setProfileReadiness(payload.profileReadiness);
@@ -45,7 +49,7 @@ export default function RecommendationsPage() {
       .catch((err: any) => {
         console.error('RECOMMENDATIONS PAGE ERROR:', err);
         setError(err?.message || 'Could not load recommendations');
-        setSource('ML API');
+        setSource('Request failed');
       });
   }, []);
 
@@ -66,6 +70,11 @@ export default function RecommendationsPage() {
   const showPercent =
     profileReadiness.recommendationMode === 'ready' &&
     canRenderMatchPercent(minScore, maxScore);
+
+  const openAssistant = (projectId?: string, action?: 'why_recommended' | 'vacancy_analysis' | 'cover_letter' | 'best_roles' | 'profile_improvement') => {
+    if (typeof window === 'undefined') return;
+    window.dispatchEvent(new CustomEvent('uniwork-ai-open', { detail: { projectId, action } }));
+  };
 
   const applyToProject = async (projectId?: string) => {
     if (!projectId) return;
@@ -103,6 +112,7 @@ export default function RecommendationsPage() {
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-3xl font-bold">Recommended Projects</h1>
+        <button type="button" onClick={() => openAssistant(undefined, 'best_roles')} className="btn-secondary">AI Assistant</button>
         <select className="rounded px-3 py-1 border" value={sort} onChange={(e) => setSort(e.target.value as any)}>
           <option value="match">Sort by match score</option>
           <option value="title">Sort by title</option>
@@ -155,7 +165,7 @@ export default function RecommendationsPage() {
                   ? 'Preliminary'
                   : profileReadiness.recommendationMode === 'blocked'
                     ? 'Profile incomplete'
-                    : 'Low-confidence match'}
+                    : 'Confidence estimate'}
               </span>
             )}
           </div>
@@ -180,8 +190,17 @@ export default function RecommendationsPage() {
             Family: <span className="font-medium text-slate-700">{i.predicted_family || 'Not specified'}</span>
           </p>
           <p className="mt-2 rounded bg-slate-50 p-2 text-xs text-slate-600">
-            {trimDescription(i.match_reason || 'Match explanation is not available yet.', 180)}
+            {trimDescription(toEnglishRecommendationText(i), 180)}
           </p>
+
+          {Array.isArray(i.matched_skills) && i.matched_skills.length > 0 && (
+            <div className="mt-2 flex flex-wrap gap-1">
+              {i.matched_skills.slice(0, 5).map((skill) => (
+                <span key={`${i.project_id}-${skill}`} className="rounded-full border border-slate-200 px-2 py-0.5 text-[11px] text-slate-600">{skill}</span>
+              ))}
+            </div>
+          )}
+
           <div className="mt-3 flex flex-wrap items-center gap-2">
             {i.project_id ? (
               <Link
@@ -209,12 +228,32 @@ export default function RecommendationsPage() {
             >
               Apply now
             </button>
+            <button type="button" onClick={() => openAssistant(i.project_id, 'why_recommended')} disabled={!i.project_id} className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 disabled:text-slate-400">Why recommended?</button>
+            <button type="button" onClick={() => openAssistant(i.project_id, 'vacancy_analysis')} disabled={!i.project_id} className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 disabled:text-slate-400">Analyze with AI</button>
+            <button type="button" onClick={() => openAssistant(i.project_id, 'cover_letter')} disabled={!i.project_id} className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 disabled:text-slate-400">Generate cover letter</button>
           </div>
           {i.project_id && applyStatus[i.project_id] && (
             <p className="mt-2 text-xs text-slate-500">{applyStatus[i.project_id]}</p>
           )}
         </div>
       ))}
+
+
+      {profileReadiness.recommendationMode !== 'blocked' && secondaryItems.length > 0 && (
+        <div className="card p-4">
+          <h3 className="text-lg font-semibold text-slate-900">Suggested internal projects</h3>
+          <p className="mt-1 text-sm text-slate-600">These are lower-confidence alternatives, shown as secondary options.</p>
+          <div className="mt-3 space-y-2">
+            {secondaryItems.slice(0, 3).map((i, idx) => (
+              <div key={`secondary-${i.project_id || idx}`} className="rounded-lg border border-slate-200 p-3 text-sm text-slate-700">
+                <p className="font-semibold">{i.title || i.job_title || 'Project suggestion'}</p>
+                <p className="text-xs text-slate-500">{i.city || 'City n/a'} · {i.experience_level || 'Experience n/a'} · {i.employment_type || 'Employment n/a'}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }
