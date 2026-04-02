@@ -41,6 +41,11 @@ export default function ProjectDetails() {
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
+  const [showApplyModal, setShowApplyModal] = useState(false);
+  const [coverLetter, setCoverLetter] = useState('');
+  const [proposedPrice, setProposedPrice] = useState('');
+  const [expectedSalary, setExpectedSalary] = useState('');
+  const [estimatedDuration, setEstimatedDuration] = useState('');
   const params = useParams<{ id: string }>();
   const id = params?.id ?? '';
 
@@ -60,30 +65,40 @@ export default function ProjectDetails() {
   const salary = useMemo(() => salaryLabel(item), [item]);
   const sections: VacancySection = item?.sections || {};
 
-  async function apply() {
+  async function submitApplication() {
     if (!item) return;
-
-    if (item?.apply_alternate_url) {
-      window.open(item.apply_alternate_url, '_blank', 'noopener,noreferrer');
-      setMessage('Opened external apply page.');
+    if (!coverLetter.trim()) {
+      setMessage('Cover letter is required.');
       return;
     }
-
-    const projectId = String(item?._id || item?.id || id);
+    const itemType = String(item?.entity_type || '').toLowerCase() === 'vacancy' ? 'vacancy' : 'project';
+    const itemId = String(item?.id || id);
     setSaving(true);
     try {
       const res = await fetch('/api/applications', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          projectId,
-          coverLetter: 'I am interested in this role and can deliver quality work on time.',
-          proposedPrice: item?.budgetMin || 300,
-          estimatedDuration: '14 days',
+          itemId,
+          itemType,
+          title: item?.title,
+          companyName: item?.company?.name || '',
+          source: item?.source || '',
+          coverLetter,
+          proposedPrice: proposedPrice ? Number(proposedPrice) : null,
+          expectedSalary: expectedSalary ? Number(expectedSalary) : null,
+          estimatedDuration: estimatedDuration || null,
         }),
       });
       const payload = await res.json();
       setMessage(res.ok ? 'Application sent successfully.' : payload?.error?.message || payload?.error || 'Failed to apply.');
+      if (res.ok) {
+        setShowApplyModal(false);
+        setCoverLetter('');
+        setProposedPrice('');
+        setExpectedSalary('');
+        setEstimatedDuration('');
+      }
     } finally {
       setSaving(false);
     }
@@ -134,9 +149,10 @@ export default function ProjectDetails() {
             <p className="mt-2 text-sm text-slate-600">{companyName} · {city}</p>
           </div>
           <div className="flex flex-wrap gap-2">
-            <button type="button" onClick={apply} disabled={saving} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-60">Apply</button>
+            <button type="button" onClick={() => setShowApplyModal(true)} disabled={saving} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-60">Apply on UniWork</button>
             <button type="button" onClick={contact} className="rounded-lg border px-4 py-2 text-sm font-semibold">Contact</button>
             <button type="button" onClick={saveFavorite} className="rounded-lg border px-4 py-2 text-sm font-semibold">Save</button>
+            {item?.alternate_url && <a href={item.alternate_url} target="_blank" rel="noreferrer" className="rounded-lg border px-4 py-2 text-sm font-semibold">Open original vacancy</a>}
           </div>
         </div>
 
@@ -206,6 +222,27 @@ export default function ProjectDetails() {
       )}
 
       {message && <div className="card p-4 text-sm text-blue-700">{message}</div>}
+
+      {showApplyModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-2xl rounded-2xl bg-white p-6 shadow-xl">
+            <h3 className="text-xl font-semibold text-slate-900">Apply on UniWork</h3>
+            <p className="mt-1 text-sm text-slate-600">Send your cover letter and optional compensation expectations.</p>
+            <div className="mt-4 space-y-3">
+              <textarea className="min-h-36 w-full rounded-xl border px-3 py-2 text-sm" value={coverLetter} onChange={(e)=>setCoverLetter(e.target.value)} placeholder="Cover letter / message to employer" />
+              <div className="grid gap-3 md:grid-cols-2">
+                <input className="rounded-xl border px-3 py-2 text-sm" value={proposedPrice} onChange={(e)=>setProposedPrice(e.target.value.replace(/[^0-9]/g,''))} placeholder="Proposed price (optional)" />
+                <input className="rounded-xl border px-3 py-2 text-sm" value={expectedSalary} onChange={(e)=>setExpectedSalary(e.target.value.replace(/[^0-9]/g,''))} placeholder="Expected salary (optional)" />
+              </div>
+              <input className="w-full rounded-xl border px-3 py-2 text-sm" value={estimatedDuration} onChange={(e)=>setEstimatedDuration(e.target.value)} placeholder="Estimated duration (optional)" />
+            </div>
+            <div className="mt-5 flex justify-end gap-2">
+              <button type="button" className="rounded-lg border px-4 py-2 text-sm font-semibold" onClick={()=>setShowApplyModal(false)}>Cancel</button>
+              <button type="button" disabled={saving} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-60" onClick={submitApplication}>Submit application</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

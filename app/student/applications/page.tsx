@@ -68,8 +68,9 @@ export default function StudentApplicationsPage() {
               <article key={row._id} className="card p-5">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
-                    <p className="text-sm text-slate-500">Project ID</p>
-                    <p className="font-semibold text-slate-900">{row.projectId}</p>
+                    <p className="text-sm text-slate-500">{row.itemType === 'vacancy' ? 'Vacancy' : 'Project'}</p>
+                    <p className="font-semibold text-slate-900">{row.title || row.itemId || row.projectId}</p>
+                    <p className="text-xs text-slate-500">{row.companyName || 'Company not specified'} {row.city ? `· ${row.city}` : ''}</p>
                   </div>
                   <span className={`status-pill ${statusStyles[row.status] || 'bg-slate-100 text-slate-700'}`}>
                     {row.status}
@@ -81,11 +82,14 @@ export default function StudentApplicationsPage() {
                   <div><p className="text-slate-500">Client</p><p className="font-medium text-slate-900">Verified client</p></div>
                 </div>
                 <div className="mt-4 flex justify-end">
-                  {row.status === 'SENT' ? (
-                    <button onClick={() => withdraw(row._id)} className="btn-secondary">Withdraw</button>
-                  ) : (
-                    <button className="btn-secondary" disabled>No actions</button>
-                  )}
+                  <div className="flex gap-2">
+                    {row.conversationId && <a className="btn-secondary" href={`/student/messages?conversationId=${row.conversationId}`}>Open chat</a>}
+                    {row.status === 'SENT' ? (
+                      <button onClick={() => withdraw(row._id)} className="btn-secondary">Withdraw</button>
+                    ) : (
+                      <button className="btn-secondary" disabled>No actions</button>
+                    )}
+                  </div>
                 </div>
               </article>
             );
