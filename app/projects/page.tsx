@@ -58,7 +58,7 @@ export default function ProjectsPage() {
         ...item,
         matchPercent: matchById.get(String(item.id)) ?? null,
       }));
-      setRows(rowsWithScore);
+      setRows(rowsWithScore.filter((item: any) => Number.isFinite(Number(item.matchPercent))));
     } finally {
       setLoading(false);
     }

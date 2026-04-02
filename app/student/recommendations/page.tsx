@@ -49,7 +49,7 @@ export default function RecommendationsPage() {
         )
       );
     } else {
-      arr.sort((a, b) => Number(b.final_score || 0) - Number(a.final_score || 0));
+      arr.sort((a, b) => Number(b.matchPercent || b.final_score || 0) - Number(a.matchPercent || a.final_score || 0));
     }
     return arr;
   }, [items, sort]);
