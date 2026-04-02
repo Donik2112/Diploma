@@ -1,8 +1,10 @@
 import { z } from 'zod';
+import mongoose from 'mongoose';
 import Project from '@/models/Project';
 import { dbConnect } from '@/lib/mongodb';
 import { handleApi, ok, ApiError } from '@/lib/api';
 import { requireAuth } from '@/lib/auth';
+import { findProjectOrVacancyById } from '@/lib/projects/findProjectOrVacancyById';
 
 const updateSchema = z.object({
   title: z.string().min(5).max(120).optional(),
@@ -20,10 +22,13 @@ const updateSchema = z.object({
 
 export async function GET(_: Request, { params }: { params: { id: string } }) {
   return handleApi(async () => {
-    await dbConnect();
-    const project = await Project.findById(params.id).lean();
-    if (!project) throw new ApiError('Project not found', 404);
-    return ok(project);
+    const found = await findProjectOrVacancyById(params.id);
+    if (!found?.doc) throw new ApiError('Project not found', 404);
+    return ok({
+      ...found.doc,
+      sourceCollection: found.sourceCollection,
+      lookupId: params.id,
+    });
   });
 }
 
@@ -32,7 +37,13 @@ export async function PUT(req: Request, { params }: { params: { id: string } }) 
     requireAuth(['CLIENT', 'ADMIN']);
     await dbConnect();
     const payload = updateSchema.parse(await req.json());
-    const updated = await Project.findByIdAndUpdate(params.id, payload, { new: true });
+    let targetId = params.id;
+    if (!mongoose.Types.ObjectId.isValid(targetId)) {
+      const raw = await Project.collection.findOne({ id: targetId }, { projection: { _id: 1 } });
+      if (!raw?._id) throw new ApiError('Project not found', 404);
+      targetId = String(raw._id);
+    }
+    const updated = await Project.findByIdAndUpdate(targetId, payload, { new: true });
     if (!updated) throw new ApiError('Project not found', 404);
     return ok(updated);
   });
@@ -42,7 +53,13 @@ export async function DELETE(_: Request, { params }: { params: { id: string } })
   return handleApi(async () => {
     requireAuth(['CLIENT', 'ADMIN']);
     await dbConnect();
-    const deleted = await Project.findByIdAndDelete(params.id);
+    let targetId = params.id;
+    if (!mongoose.Types.ObjectId.isValid(targetId)) {
+      const raw = await Project.collection.findOne({ id: targetId }, { projection: { _id: 1 } });
+      if (!raw?._id) throw new ApiError('Project not found', 404);
+      targetId = String(raw._id);
+    }
+    const deleted = await Project.findByIdAndDelete(targetId);
     if (!deleted) throw new ApiError('Project not found', 404);
     return ok({ removed: true });
   });
