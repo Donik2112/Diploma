@@ -1,13 +1,10 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import {
-  canRenderMatchPercent,
   extractRecommendations,
-  getScoreRange,
   JobRecommendation,
-  scoreToPercent,
   trimDescription,
 } from '@/lib/jobRecommendations';
 import { ProfileReadiness } from '@/lib/profileReadiness';
@@ -32,7 +29,7 @@ export default function StudentDashboard() {
           fetch('/api/recommend', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ top_n: 5 })
+            body: JSON.stringify({ top_n: 50 })
           }),
           fetch('/api/student/profile')
         ]);
@@ -54,13 +51,6 @@ export default function StudentDashboard() {
   const sent = applications.length;
   const accepted = applications.filter((x) => x.status === 'ACCEPTED').length;
   const inProgress = applications.filter((x) => x.status === 'SENT').length;
-  const { minScore, maxScore } = useMemo(
-    () => getScoreRange(recommendations),
-    [recommendations]
-  );
-  const showPercent =
-    profileReadiness.recommendationMode === 'ready' &&
-    canRenderMatchPercent(minScore, maxScore);
 
   const applyToProject = async (projectId?: string) => {
     if (!projectId) return;
@@ -194,8 +184,8 @@ export default function StudentDashboard() {
                       )}
                     </div>
                     <span className="status-pill bg-blue-100 text-blue-700">
-                      {showPercent
-                        ? `${scoreToPercent(Number(rec.final_score), minScore, maxScore)}% match`
+                      {Number.isFinite(Number(rec.matchPercent))
+                        ? `${Math.round(Number(rec.matchPercent))}% match`
                         : 'Low-confidence match'}
                     </span>
                   </div>

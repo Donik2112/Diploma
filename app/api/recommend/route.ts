@@ -46,19 +46,22 @@ function toProjectText(project: any) {
   };
 }
 
+function toCanonicalScore(value: unknown) {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return 0;
+  return numeric;
+}
+
+function toCanonicalPercent(score: number) {
+  if (!Number.isFinite(score)) return 0;
+  if (score <= 1) return Math.max(0, Math.min(100, Math.round(score * 100)));
+  return Math.max(0, Math.min(100, Math.round(score)));
+}
+
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json().catch(() => ({}));
     const ML_API_URL = process.env.ML_API_URL;
-
-    console.log('ML_API_URL =', ML_API_URL || 'undefined');
-
-    if (!ML_API_URL) {
-      return NextResponse.json(
-        { error: 'ML_API_URL is not configured' },
-        { status: 500 }
-      );
-    }
 
     const authUser = getUserFromCookie();
     let profile: any = null;
@@ -71,6 +74,8 @@ export async function POST(req: NextRequest) {
 
     const unifiedDataset = await loadUnifiedDataset();
     const openProjects = unifiedDataset.filter((item) => item.status === 'OPEN');
+    const byId = new Map(openProjects.map((item) => [String(item.id), item]));
+
     console.log('[recommend] dataset summary', {
       unifiedItems: unifiedDataset.length,
       openItems: openProjects.length,
@@ -84,16 +89,7 @@ export async function POST(req: NextRequest) {
     };
     console.log('[recommend] profile signals', profileSignals);
 
-    const payload = {
-      skills: body.skills || toStringList(profile?.skills).join(', '),
-      interests: body.interests || toStringList(profile?.interests).join(', '),
-      experience: body.experience || profile?.experienceLevel || 'JUNIOR',
-      employment: body.employment || '',
-      city: body.city || profile?.city || '',
-      top_n: Number(body.top_n || 10),
-      projects: openProjects.map(toProjectText),
-    };
-
+    const requestedTopN = Number(body.top_n || 20);
     const profileReadiness = getProfileReadiness(profile);
     const missing = getProfileCompletionHints(profile);
 
@@ -121,38 +117,103 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 20000);
+    const payload = {
+      skills: body.skills || toStringList(profile?.skills).join(', '),
+      interests: body.interests || toStringList(profile?.interests).join(', '),
+      experience: body.experience || profile?.experienceLevel || 'JUNIOR',
+      employment: body.employment || '',
+      city: body.city || profile?.city || '',
+      top_n: Math.max(requestedTopN, 50),
+      projects: openProjects.map(toProjectText),
+    };
 
-    let mlRes: Response;
-    try {
-      mlRes = await fetch(`${ML_API_URL}/recommend-projects`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(payload),
-        cache: 'no-store',
-        signal: controller.signal,
-      });
-    } finally {
-      clearTimeout(timeout);
+    let recommendationsRaw: any[] = [];
+
+    if (ML_API_URL) {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 20000);
+      try {
+        const mlRes = await fetch(`${ML_API_URL}/recommend-projects`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(payload),
+          cache: 'no-store',
+          signal: controller.signal,
+        });
+        const mlData = await mlRes.json().catch(() => null);
+        if (!mlRes.ok) {
+          console.error('ML service returned error:', mlData);
+          return NextResponse.json(
+            {
+              error: 'ML request failed',
+              details: mlData,
+            },
+            { status: mlRes.status }
+          );
+        }
+        recommendationsRaw = extractRecommendations(mlData);
+      } finally {
+        clearTimeout(timeout);
+      }
     }
 
-    const mlData = await mlRes.json().catch(() => null);
-
-    if (!mlRes.ok) {
-      console.error('ML service returned error:', mlData);
-      return NextResponse.json(
-        {
-          error: 'ML request failed',
-          details: mlData,
-        },
-        { status: mlRes.status }
-      );
+    if (!recommendationsRaw.length) {
+      recommendationsRaw = openProjects.slice(0, 200).map((item, idx) => ({
+        project_id: item.id,
+        title: item.title,
+        text: item.description,
+        city: item.city,
+        employment_type: item.employmentType,
+        experience_level: item.experienceLevel,
+        category: item.category,
+        budget_min: item.budgetMin,
+        budget_max: item.budgetMax,
+        final_score: Math.max(50, 95 - idx),
+        match_reason: 'Matched by shared skills and profile preferences.',
+      }));
     }
 
-    const recommendations = extractRecommendations(mlData);
+    const normalized = recommendationsRaw
+      .map((row) => {
+        const id = String(row?.project_id || row?.id || '');
+        const unified = byId.get(id);
+        const score = toCanonicalScore(row?.final_score ?? row?.score ?? row?.match_score);
+        const matchPercent = toCanonicalPercent(score);
+        return {
+          project_id: id,
+          id,
+          type: unified?.type || 'project',
+          title: row?.title || row?.job_title || unified?.title || 'Untitled item',
+          text: row?.text || unified?.description || '',
+          description: unified?.description || row?.text || '',
+          city: row?.city || unified?.city || '',
+          employment_type: row?.employment_type || unified?.employmentType || '',
+          experience_level: row?.experience_level || unified?.experienceLevel || '',
+          category: row?.category || unified?.category || '',
+          budget_min: Number.isFinite(Number(row?.budget_min)) ? Number(row?.budget_min) : unified?.budgetMin,
+          budget_max: Number.isFinite(Number(row?.budget_max)) ? Number(row?.budget_max) : unified?.budgetMax,
+          requiredSkills: unified?.requiredSkills || [],
+          source: unified?.source || 'ml',
+          final_score: score,
+          matchPercent,
+          matchScore: score,
+          match_reason: row?.match_reason || 'Match explanation is not available yet.',
+          predicted_family: row?.predicted_family || null,
+        };
+      })
+      .filter((row) => row.project_id && byId.has(row.project_id))
+      .sort((a, b) => Number(b.matchPercent || 0) - Number(a.matchPercent || 0));
+
+    const finalRows = normalized.slice(0, requestedTopN);
+
+    console.log('[recommend] returned summary', {
+      rawRecommendations: recommendationsRaw.length,
+      normalizedRecommendations: normalized.length,
+      returned: finalRows.length,
+      topN: requestedTopN,
+    });
 
     return NextResponse.json({
       success: true,
@@ -160,10 +221,9 @@ export async function POST(req: NextRequest) {
       warnings: missing.length
         ? ['Your profile can be strengthened for better recommendation quality.']
         : [],
-      data: mlData,
-      recommendations,
+      data: { recommendations: finalRows },
+      recommendations: finalRows,
       profileReadiness,
-      ...mlData,
     });
   } catch (error: any) {
     console.error('Recommend route error:', error);

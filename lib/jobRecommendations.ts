@@ -16,6 +16,11 @@ export type JobRecommendation = {
   rank_score?: number;
   final_score?: number;
   final_score_percent?: number;
+  id?: string;
+  type?: 'vacancy' | 'project';
+  source?: string;
+  matchScore?: number;
+  matchPercent?: number;
   match_reason?: string;
   predicted_family?: string;
 };

@@ -3,25 +3,24 @@
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 
-type Project = {
-  _id: string;
+type UnifiedProject = {
+  id: string;
+  type: 'vacancy' | 'project';
   title: string;
   description: string;
   category: string;
   city?: string;
-  budgetMin: number;
-  budgetMax: number;
+  budgetMin: number | null;
+  budgetMax: number | null;
   requiredSkills?: string[];
-  deadline?: string;
+  deadline?: string | null;
   experienceLevel?: string;
+  employmentType?: string;
+  source?: string;
 };
 
-const categoryOptions = ['Web Development', 'Data Analytics', 'Mobile', 'UI/UX'];
-const experienceOptions = ['JUNIOR', 'MIDDLE', 'SENIOR'];
-const employmentOptions = ['Part-time', 'Contract', 'Full-time'];
-
 export default function ProjectsPage() {
-  const [rows, setRows] = useState<Project[]>([]);
+  const [rows, setRows] = useState<UnifiedProject[]>([]);
   const [saved, setSaved] = useState<Record<string, boolean>>({});
   const [loading, setLoading] = useState(false);
   const [form, setForm] = useState({
@@ -49,11 +48,20 @@ export default function ProjectsPage() {
 
   const quickStats = useMemo(() => {
     const total = rows.length;
-    const avgBudget = total
-      ? Math.round(rows.reduce((acc, r) => acc + (r.budgetMin + r.budgetMax) / 2, 0) / total)
-      : 0;
+    const budgets = rows
+      .map((r) => [Number(r.budgetMin), Number(r.budgetMax)])
+      .flat()
+      .filter((x) => Number.isFinite(x) && x > 0);
+    const avgBudget = budgets.length ? Math.round(budgets.reduce((a, b) => a + b, 0) / budgets.length) : 0;
     return { total, avgBudget };
   }, [rows]);
+
+  const categoryOptions = useMemo(() => {
+    return Array.from(new Set(rows.map((row) => row.category).filter(Boolean))).slice(0, 20);
+  }, [rows]);
+
+  const experienceOptions = ['junior', 'middle', 'senior'];
+  const employmentOptions = ['full-time', 'part-time', 'contract', 'project', 'internship'];
 
   return (
     <div className="space-y-6 py-2">
@@ -106,11 +114,11 @@ export default function ProjectsPage() {
           <div className="card p-4">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="flex flex-wrap gap-2">
-                <span className="pill">Verified clients</span>
+                <span className="pill">Unified vacancies + projects</span>
                 <span className="pill">Fast response</span>
                 <span className="pill">Student-friendly scope</span>
               </div>
-              <p className="text-sm text-slate-500">{rows.length} projects found</p>
+              <p className="text-sm text-slate-500">{rows.length} opportunities found</p>
             </div>
           </div>
 
@@ -127,31 +135,30 @@ export default function ProjectsPage() {
           )}
 
           {!loading && rows.map((p) => {
-            const matchScore = Math.min(98, Math.max(62, Math.floor((p.requiredSkills?.length || 3) * 9 + 55)));
             return (
-              <article key={p._id} className="card p-5 md:p-6">
+              <article key={p.id} className="card p-5 md:p-6">
                 <div className="flex flex-wrap items-start justify-between gap-4">
                   <div>
-                    <Link href={`/projects/${p._id}`} className="text-xl font-semibold text-slate-900 hover:text-blue-700">
+                    <Link href={`/projects/${encodeURIComponent(p.id)}`} className="text-xl font-semibold text-slate-900 hover:text-blue-700">
                       {p.title}
                     </Link>
                     <p className="mt-2 text-sm leading-relaxed text-slate-600">{p.description}</p>
                   </div>
-                  <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-700">
-                    Match {matchScore}%
+                  <div className="rounded-2xl border border-blue-200 bg-blue-50 px-3 py-2 text-sm font-semibold text-blue-700">
+                    {p.type}
                   </div>
                 </div>
 
                 <div className="mt-4 flex flex-wrap items-center gap-2">
                   {(p.requiredSkills || []).slice(0, 6).map((skill) => (
-                    <span key={`${p._id}-${skill}`} className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-medium text-slate-700">
+                    <span key={`${p.id}-${skill}`} className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-medium text-slate-700">
                       {skill}
                     </span>
                   ))}
                 </div>
 
                 <div className="mt-5 grid gap-3 text-sm text-slate-600 md:grid-cols-4">
-                  <div><p className="text-xs text-slate-500">Budget</p><p className="font-semibold text-slate-900">${p.budgetMin} - ${p.budgetMax}</p></div>
+                  <div><p className="text-xs text-slate-500">Budget</p><p className="font-semibold text-slate-900">{Number.isFinite(Number(p.budgetMin)) || Number.isFinite(Number(p.budgetMax)) ? `$${p.budgetMin ?? 0} - $${p.budgetMax ?? 0}` : 'Not specified'}</p></div>
                   <div><p className="text-xs text-slate-500">Category</p><p className="font-semibold text-slate-900">{p.category || 'General'}</p></div>
                   <div><p className="text-xs text-slate-500">City</p><p className="font-semibold text-slate-900">{p.city || 'Remote / Flexible'}</p></div>
                   <div><p className="text-xs text-slate-500">Deadline</p><p className="font-semibold text-slate-900">{p.deadline ? new Date(p.deadline).toLocaleDateString() : 'Negotiable'}</p></div>
@@ -159,14 +166,14 @@ export default function ProjectsPage() {
 
                 <div className="mt-5 flex flex-wrap items-center justify-between gap-3">
                   <div className="flex items-center gap-2 text-xs text-slate-500">
-                    <span className="status-pill bg-emerald-100 text-emerald-700">Verified client</span>
-                    <span className="status-pill bg-blue-100 text-blue-700">Recommended for your profile</span>
+                    <span className="status-pill bg-emerald-100 text-emerald-700">OPEN</span>
+                    <span className="status-pill bg-blue-100 text-blue-700">{p.source || 'unified'}</span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <button onClick={() => setSaved((prev) => ({ ...prev, [p._id]: !prev[p._id] }))} className="btn-secondary">
-                      {saved[p._id] ? 'Saved' : 'Save'}
+                    <button onClick={() => setSaved((prev) => ({ ...prev, [p.id]: !prev[p.id] }))} className="btn-secondary">
+                      {saved[p.id] ? 'Saved' : 'Save'}
                     </button>
-                    <Link href={`/projects/${p._id}`} className="btn-primary">View details</Link>
+                    <Link href={`/projects/${encodeURIComponent(p.id)}`} className="btn-primary">View details</Link>
                   </div>
                 </div>
               </article>
@@ -176,7 +183,7 @@ export default function ProjectsPage() {
           {!loading && rows.length === 0 && (
             <div className="card p-10 text-center">
               <p className="text-3xl">🔎</p>
-              <h3 className="mt-3 text-lg font-semibold text-slate-900">No projects match your filters yet</h3>
+              <h3 className="mt-3 text-lg font-semibold text-slate-900">No opportunities match your filters yet</h3>
               <p className="mt-2 text-sm text-slate-600">Try broader filters or remove strict conditions to discover more opportunities.</p>
               <button onClick={() => { setForm({ q: '', category: '', city: '', experience: '', employment: '', sort: 'newest' }); setTimeout(load, 0); }} className="btn-primary mt-4">
                 Reset filters

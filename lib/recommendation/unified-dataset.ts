@@ -21,6 +21,8 @@ export type UnifiedItem = {
   createdAt: string | null;
   source: string;
   raw?: any;
+  matchScore?: number;
+  matchPercent?: number;
 };
 
 const EMPLOYMENT_MAP: Record<string, string> = {

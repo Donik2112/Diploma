@@ -3,11 +3,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import {
-  canRenderMatchPercent,
   extractRecommendations,
-  getScoreRange,
   JobRecommendation,
-  scoreToPercent,
   trimDescription,
 } from '@/lib/jobRecommendations';
 import { ProfileReadiness } from '@/lib/profileReadiness';
@@ -27,7 +24,7 @@ export default function RecommendationsPage() {
     fetch('/api/recommend', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ top_n: 8 })
+      body: JSON.stringify({ top_n: 50 })
     })
       .then((r) => r.json())
       .then((payload) => {
@@ -56,10 +53,6 @@ export default function RecommendationsPage() {
     }
     return arr;
   }, [items, sort]);
-  const { minScore, maxScore } = useMemo(() => getScoreRange(rendered), [rendered]);
-  const showPercent =
-    profileReadiness.recommendationMode === 'ready' &&
-    canRenderMatchPercent(minScore, maxScore);
 
   const applyToProject = async (projectId?: string) => {
     if (!projectId) return;
@@ -137,9 +130,9 @@ export default function RecommendationsPage() {
         <div key={i.project_id || `${i.title || 'project'}-${idx}`} className="card p-4">
           <div className="flex justify-between gap-3">
             <h3 className="font-semibold">{i.title || i.job_title || `Recommendation #${idx + 1}`}</h3>
-            {showPercent ? (
+            {Number.isFinite(Number(i.matchPercent)) ? (
               <span className="text-brand font-semibold">
-                {scoreToPercent(Number(i.final_score), minScore, maxScore)}% match
+                {Math.round(Number(i.matchPercent))}% match
               </span>
             ) : (
               <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-700">
