@@ -38,16 +38,18 @@ export default function ProjectsPage() {
     setLoading(true);
     try {
       const qs = new URLSearchParams(form as any).toString();
-      const [projectsRes, recommendRes] = await Promise.all([
+      const [projectsRes, recommendRes, favoritesRes] = await Promise.all([
         fetch(`/api/projects?${qs}`),
         fetch('/api/recommend', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ top_n: 200 }),
         }),
+        fetch('/api/favorites').catch(() => null),
       ]);
       const payload = await projectsRes.json();
       const recommendPayload = await recommendRes.json();
+      const favoritesPayload = favoritesRes ? await favoritesRes.json() : { data: [] };
       const recommendations = Array.isArray(recommendPayload?.recommendations)
         ? recommendPayload.recommendations
         : Array.isArray(recommendPayload?.data?.recommendations)
@@ -59,6 +61,8 @@ export default function ProjectsPage() {
         matchPercent: matchById.get(String(item.id)) ?? null,
       }));
       setRows(rowsWithScore.filter((item: any) => Number.isFinite(Number(item.matchPercent))));
+      const favoriteMap = Object.fromEntries((favoritesPayload?.data || []).map((x: any) => [String(x.itemId), true]));
+      setSaved(favoriteMap);
     } finally {
       setLoading(false);
     }
@@ -82,6 +86,26 @@ export default function ProjectsPage() {
 
   const experienceOptions = ['junior', 'middle', 'senior'];
   const employmentOptions = ['full-time', 'part-time', 'contract', 'project', 'internship'];
+
+
+  async function toggleFavorite(item: UnifiedProject) {
+    setSaved((prev) => ({ ...prev, [item.id]: !prev[item.id] }));
+    await fetch('/api/favorites', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        itemId: item.id,
+        itemType: item.type,
+        title: item.title,
+        companyName: item.company || '',
+        city: item.city || '',
+        category: item.category || '',
+        budgetMin: item.budgetMin ?? null,
+        budgetMax: item.budgetMax ?? null,
+        source: item.source || '',
+      }),
+    });
+  }
 
   return (
     <div className="space-y-6 py-2">
@@ -190,8 +214,8 @@ export default function ProjectsPage() {
                     <span className="status-pill bg-blue-100 text-blue-700">{p.source || 'unified'}</span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <button onClick={() => setSaved((prev) => ({ ...prev, [p.id]: !prev[p.id] }))} className="btn-secondary">
-                      {saved[p.id] ? 'Saved' : 'Save'}
+                    <button onClick={() => toggleFavorite(p)} className="btn-secondary">
+                      {saved[p.id] ? '♥ Saved' : '♡ Save'}
                     </button>
                     <button type="button" className="btn-secondary">Apply</button>
                     <Link href={`/projects/${encodeURIComponent(p.id)}`} className="btn-primary">View details</Link>

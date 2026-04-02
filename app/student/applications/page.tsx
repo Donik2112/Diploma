@@ -17,9 +17,27 @@ export default function StudentApplicationsPage() {
   async function load() {
     setLoading(true);
     try {
-      const res = await fetch('/api/applications');
-      const payload = await res.json();
-      setRows(payload.data || []);
+      const [appRes, recRes] = await Promise.all([
+        fetch('/api/applications'),
+        fetch('/api/recommend', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ top_n: 500 }),
+        }),
+      ]);
+      const appPayload = await appRes.json();
+      const recPayload = await recRes.json();
+      const recommendations = Array.isArray(recPayload?.recommendations)
+        ? recPayload.recommendations
+        : Array.isArray(recPayload?.data?.recommendations)
+          ? recPayload.data.recommendations
+          : [];
+      const matchById = new Map(recommendations.map((x: any) => [String(x.project_id || x.id), Number(x.matchPercent || 0)]));
+      const hydrated = (appPayload.data || []).map((row: any) => ({
+        ...row,
+        matchPercent: matchById.get(String(row.itemId || row.projectId || '')) ?? null,
+      }));
+      setRows(hydrated);
     } finally {
       setLoading(false);
     }
@@ -63,7 +81,7 @@ export default function StudentApplicationsPage() {
       ) : filtered.length ? (
         <div className="grid gap-3">
           {filtered.map((row: any) => {
-            const match = Math.min(96, Math.max(60, 72 + (row.status === 'ACCEPTED' ? 20 : 0)));
+            const match = Number(row.matchPercent);
             return (
               <article key={row._id} className="card p-5">
                 <div className="flex flex-wrap items-start justify-between gap-3">
@@ -78,7 +96,7 @@ export default function StudentApplicationsPage() {
                 </div>
                 <div className="mt-4 grid gap-3 text-sm md:grid-cols-3">
                   <div><p className="text-slate-500">Submitted</p><p className="font-medium text-slate-900">{new Date(row.createdAt).toLocaleDateString()}</p></div>
-                  <div><p className="text-slate-500">Match score</p><p className="font-medium text-slate-900">{match}%</p></div>
+                  <div><p className="text-slate-500">Match score</p><p className="font-medium text-slate-900">{Number.isFinite(match) ? `${Math.round(match)}%` : 'N/A'}</p></div>
                   <div><p className="text-slate-500">Client</p><p className="font-medium text-slate-900">Verified client</p></div>
                 </div>
                 <div className="mt-4 flex justify-end">

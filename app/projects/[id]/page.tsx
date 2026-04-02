@@ -117,8 +117,26 @@ export default function ProjectDetails() {
     setMessage('No direct contact details available for this role.');
   }
 
-  function saveFavorite() {
-    setMessage('Saved to favorites (local session).');
+  async function saveFavorite() {
+    if (!item) return;
+    const itemType = String(item?.entity_type || '').toLowerCase() === 'vacancy' ? 'vacancy' : 'project';
+    const itemId = String(item?.id || id);
+    await fetch('/api/favorites', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        itemId,
+        itemType,
+        title: item?.title || '',
+        companyName: item?.company?.name || '',
+        city: item?.location?.city || item?.city || '',
+        category: item?.category || '',
+        budgetMin: item?.budgetMin ?? item?.salary?.from ?? null,
+        budgetMax: item?.budgetMax ?? item?.salary?.to ?? null,
+        source: item?.source || '',
+      }),
+    });
+    setMessage('Favorites updated.');
   }
 
   if (error) return <div className="card p-6 text-red-600">{error}</div>;

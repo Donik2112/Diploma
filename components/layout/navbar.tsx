@@ -131,6 +131,9 @@ export function Navbar() {
           )}
           {!loading && authUser && (
             <>
+              <Link href="/favorites" className="btn-secondary" title="Saved vacancies">
+                ♥
+              </Link>
               <Link href={profileHref} className="btn-secondary">
                 Profile
               </Link>
@@ -159,7 +162,10 @@ export function Navbar() {
               </Link>
             ))}
             {!loading && authUser && (
-              <Link href={profileHref} onClick={() => setMobileOpen(false)} className="btn-secondary">Profile</Link>
+              <>
+                <Link href="/favorites" onClick={() => setMobileOpen(false)} className="btn-secondary">♥ Favorites</Link>
+                <Link href={profileHref} onClick={() => setMobileOpen(false)} className="btn-secondary">Profile</Link>
+              </>
             )}
             {!loading && !authUser && (
               <>
