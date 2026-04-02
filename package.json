@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "seed": "tsx prisma/seed.ts"
+    "seed": "tsx prisma/seed.ts",
+    "migrate:bundle": "tsx scripts/migrate-bundle-to-collections.ts"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",

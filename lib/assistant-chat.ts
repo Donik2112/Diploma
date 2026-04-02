@@ -245,7 +245,7 @@ async function fetchRecommendations(profile: any, message: string) {
           final_score: score,
         };
       })
-      .sort((a, b) => Number(b.final_score) - Number(a.final_score));
+      .sort((a: { final_score?: number }, b: { final_score?: number }) => Number(b.final_score || 0) - Number(a.final_score || 0));
   }
 
   return recommendations;
