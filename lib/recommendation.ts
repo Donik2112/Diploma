@@ -1,4 +1,4 @@
-import Project from '@/models/Project';
+import { loadUnifiedDatasetFromJson } from '@/lib/recommendation/unified-dataset';
 
 export type RecommendInput = {
   skills: string[];
@@ -20,7 +20,7 @@ export async function getRecommendations(input: RecommendInput) {
     if (response.ok) return { source: 'ML API', recommendations: await response.json() };
   }
 
-  const projects = await Project.find({ status: 'OPEN' }).limit(200).lean();
+  const projects = (await loadUnifiedDatasetFromJson()).filter((item) => item.status === 'OPEN').slice(0, 200);
   const normalizedSkills = input.skills.map((s) => s.toLowerCase());
   const scored = projects.map((p: any) => {
     const matchedSkills = (p.requiredSkills || []).filter((skill: string) => normalizedSkills.includes(skill.toLowerCase()));
@@ -29,7 +29,7 @@ export async function getRecommendations(input: RecommendInput) {
     const cityScore = input.city && p.city === input.city ? 0.1 : 0;
     const score = Math.min(1, skillScore * 0.7 + expScore + cityScore);
     return {
-      projectId: p._id.toString(),
+      projectId: String(p.id),
       title: p.title,
       matchScore: score,
       matchScorePercent: Math.round(score * 100),

@@ -1,27 +1,11 @@
 import { NextResponse } from 'next/server';
-import { dbConnect } from '@/lib/mongodb';
-import Vacancy from '@/models/Vacancy';
-import ImportedProject from '@/models/ImportedProject';
-import { mapProjectToLegacyCard, mapVacancyToLegacyCard } from '@/lib/adapters/legacy-items';
+import { loadUnifiedDatasetFromJson } from '@/lib/recommendation/unified-dataset';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET() {
   try {
-    await dbConnect();
-
-    const [vacanciesRaw, projectsRaw] = await Promise.all([
-      Vacancy.find({}).lean(),
-      ImportedProject.find({}).lean(),
-    ]);
-
-    const vacancies = Array.isArray(vacanciesRaw) ? vacanciesRaw : [];
-    const projects = Array.isArray(projectsRaw) ? projectsRaw : [];
-
-    const items = [
-      ...vacancies.map((vacancy) => mapVacancyToLegacyCard(vacancy as Record<string, any>)),
-      ...projects.map((project) => mapProjectToLegacyCard(project as Record<string, any>)),
-    ];
+    const items = await loadUnifiedDatasetFromJson();
 
     return NextResponse.json({
       success: true,

@@ -1,0 +1,213 @@
+import { promises as fs } from 'fs';
+import path from 'path';
+
+export type UnifiedItem = {
+  id: string;
+  type: 'vacancy' | 'project';
+  clientId: string | null;
+  title: string;
+  description: string;
+  category: string;
+  requiredSkills: string[];
+  budgetMin: number | null;
+  budgetMax: number | null;
+  deadline: string | null;
+  city: string;
+  employmentType: string;
+  experienceLevel: string;
+  status: 'OPEN' | 'CLOSED';
+  createdAt: string | null;
+  source: string;
+  raw?: any;
+};
+
+const EMPLOYMENT_MAP: Record<string, string> = {
+  'Полная занятость': 'full-time',
+  'Частичная занятость': 'part-time',
+  'Проектная работа': 'project',
+  'Стажировка': 'internship',
+};
+
+const EXPERIENCE_MAP: Record<string, string> = {
+  'Нет опыта': 'junior',
+  'От 1 года до 3 лет': 'middle',
+  'От 3 до 6 лет': 'senior',
+  'Более 6 лет': 'senior',
+};
+
+export function normalizeEmploymentType(value?: string | null): string {
+  if (!value) return 'full-time';
+  return EMPLOYMENT_MAP[value] || value.toLowerCase();
+}
+
+export function normalizeExperienceLevel(value?: string | null): string {
+  if (!value) return 'middle';
+  return EXPERIENCE_MAP[value] || value.toLowerCase();
+}
+
+export function extractSkillNames(skills: unknown[] = []): string[] {
+  return skills
+    .map((skill) => {
+      if (typeof skill === 'string') return skill;
+      if (skill && typeof skill === 'object' && 'name' in skill) {
+        return String((skill as { name?: unknown }).name || '');
+      }
+      return '';
+    })
+    .map((skill) => skill.trim())
+    .filter(Boolean);
+}
+
+export function inferCategoryFromText(title: string, description: string, skills: string[]): string {
+  const text = `${title} ${description} ${skills.join(' ')}`.toLowerCase();
+
+  if (/(telegram bot|bot\b)/i.test(text)) return 'Bot Development';
+  if (/(react|vue|javascript|html|css|frontend)/i.test(text)) return 'Frontend';
+  if (/(python|django|fastapi|flask|api|backend|node\.js|nodejs|express)/i.test(text)) return 'Backend';
+  if (/(sql|analyst|analytics|power bi|excel|pandas)/i.test(text)) return 'Data Analytics';
+  if (/(airflow|etl|data engineer)/i.test(text)) return 'Data Engineering';
+  if (/(docker|kubernetes|devops|ci\/cd|ansible)/i.test(text)) return 'DevOps';
+  if (/(qa|test|testing|selenium)/i.test(text)) return 'QA';
+  if (/(ml|machine learning|ai|llm|nlp|rag|transformers)/i.test(text)) return 'Machine Learning';
+
+  return 'Other';
+}
+
+export function mapVacancyToUnifiedItem(vacancy: Record<string, any>): UnifiedItem {
+  const requiredSkills = extractSkillNames(Array.isArray(vacancy?.key_skills) ? vacancy.key_skills : []);
+  const title = String(vacancy?.title || '');
+  const description = String(vacancy?.description_text || '');
+
+  return {
+    id: String(vacancy?.id || ''),
+    type: 'vacancy',
+    clientId: vacancy?.company?.id ? String(vacancy.company.id) : null,
+    title,
+    description,
+    category: inferCategoryFromText(title, description, requiredSkills),
+    requiredSkills,
+    budgetMin: Number.isFinite(Number(vacancy?.salary?.from)) ? Number(vacancy.salary.from) : null,
+    budgetMax: Number.isFinite(Number(vacancy?.salary?.to)) ? Number(vacancy.salary.to) : null,
+    deadline: null,
+    city: String(vacancy?.location?.city || 'Remote'),
+    employmentType: normalizeEmploymentType(vacancy?.employment_type || null),
+    experienceLevel: normalizeExperienceLevel(vacancy?.experience_level || null),
+    status: vacancy?.closed_for_applicants ? 'CLOSED' : 'OPEN',
+    createdAt: vacancy?.created_at || vacancy?.published_at || null,
+    source: String(vacancy?.source || 'hh.kz'),
+    raw: vacancy,
+  };
+}
+
+export function mapProjectToUnifiedItem(project: Record<string, any>): UnifiedItem {
+  const requiredSkills = Array.isArray(project?.required_skills)
+    ? project.required_skills.map((x: unknown) => String(x)).filter(Boolean)
+    : [];
+
+  const difficulty = String(project?.difficulty || '').toLowerCase();
+  const level = difficulty === 'easy' ? 'junior' : difficulty === 'medium' ? 'middle' : difficulty === 'hard' ? 'senior' : 'middle';
+  const title = String(project?.title || '');
+  const description = String(project?.summary || '');
+
+  return {
+    id: String(project?.id || ''),
+    type: 'project',
+    clientId: project?.related_vacancy_id ? String(project.related_vacancy_id) : null,
+    title,
+    description,
+    category: String(project?.category || inferCategoryFromText(title, description, requiredSkills)),
+    requiredSkills,
+    budgetMin: null,
+    budgetMax: null,
+    deadline: null,
+    city: 'Remote',
+    employmentType: 'project',
+    experienceLevel: level,
+    status: 'OPEN',
+    createdAt: null,
+    source: String(project?.source || 'generated_from_vacancy'),
+    raw: project,
+  };
+}
+
+export function mapVacancyCardToUnifiedItem(card: Record<string, any>): UnifiedItem {
+  const requiredSkills = extractSkillNames(Array.isArray(card?.key_skills) ? card.key_skills : []);
+  const title = String(card?.title || card?.name || 'Vacancy card');
+  const description = String(card?.description_text || card?.description || '');
+  const fallbackId = card?.vacancy_id || card?.alternate_url || title;
+
+  return {
+    id: String(card?.id || fallbackId),
+    type: 'vacancy',
+    clientId: card?.company?.id ? String(card.company.id) : null,
+    title,
+    description,
+    category: inferCategoryFromText(title, description, requiredSkills),
+    requiredSkills,
+    budgetMin: Number.isFinite(Number(card?.salary?.from)) ? Number(card.salary.from) : null,
+    budgetMax: Number.isFinite(Number(card?.salary?.to)) ? Number(card.salary.to) : null,
+    deadline: null,
+    city: String(card?.location?.city || card?.city || 'Remote'),
+    employmentType: normalizeEmploymentType(card?.employment_type || null),
+    experienceLevel: normalizeExperienceLevel(card?.experience_level || null),
+    status: card?.closed_for_applicants ? 'CLOSED' : 'OPEN',
+    createdAt: card?.created_at || card?.published_at || null,
+    source: String(card?.source || 'vacancy_card'),
+    raw: card,
+  };
+}
+
+export function buildUnifiedDataset(input: {
+  vacancies?: Record<string, any>[];
+  projects?: Record<string, any>[];
+  vacancyCards?: Record<string, any>[];
+}): UnifiedItem[] {
+  const vacancies = Array.isArray(input.vacancies) ? input.vacancies.map(mapVacancyToUnifiedItem) : [];
+  const projects = Array.isArray(input.projects) ? input.projects.map(mapProjectToUnifiedItem) : [];
+  const cards = Array.isArray(input.vacancyCards) ? input.vacancyCards.map(mapVacancyCardToUnifiedItem) : [];
+
+  const seen = new Set<string>();
+  const merged: UnifiedItem[] = [];
+
+  for (const item of [...vacancies, ...projects]) {
+    seen.add(item.id);
+    merged.push(item);
+  }
+
+  for (const card of cards) {
+    if (seen.has(card.id)) continue;
+    merged.push(card);
+  }
+
+  return merged;
+}
+
+async function readJsonArray(filePath: string): Promise<Record<string, any>[]> {
+  try {
+    const raw = await fs.readFile(filePath, 'utf8');
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+export async function loadUnifiedDatasetFromJson(): Promise<UnifiedItem[]> {
+  const candidateDirs = [
+    path.join(process.cwd(), 'data'),
+    path.join(process.cwd(), 'public', 'data'),
+    process.cwd(),
+  ];
+
+  for (const dir of candidateDirs) {
+    const vacancies = await readJsonArray(path.join(dir, 'vacancies.json'));
+    const projects = await readJsonArray(path.join(dir, 'projects.json'));
+    const vacancyCards = await readJsonArray(path.join(dir, 'vacancy_cards.json'));
+
+    if (vacancies.length || projects.length || vacancyCards.length) {
+      return buildUnifiedDataset({ vacancies, projects, vacancyCards });
+    }
+  }
+
+  return [];
+}

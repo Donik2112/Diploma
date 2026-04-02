@@ -2,8 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getUserFromCookie } from '@/lib/auth';
 import { dbConnect } from '@/lib/mongodb';
 import StudentProfile from '@/models/StudentProfile';
-import Project from '@/models/Project';
 import { getProfileReadiness } from '@/lib/profileReadiness';
+import { loadUnifiedDatasetFromJson } from '@/lib/recommendation/unified-dataset';
 
 export const dynamic = 'force-dynamic';
 
@@ -31,7 +31,7 @@ function extractRecommendations(raw: any): any[] {
 
 function toProjectText(project: any) {
   return {
-    project_id: String(project?._id || ''),
+    project_id: String(project?.id || ''),
     title: String(project?.title || ''),
     skills: Array.isArray(project?.requiredSkills)
       ? project.requiredSkills.join(', ')
@@ -69,20 +69,8 @@ export async function POST(req: NextRequest) {
       profile = await StudentProfile.findOne({ userId: authUser.userId }).lean();
     }
 
-    const openProjects = await Project.find({ status: 'OPEN' })
-      .select({
-        _id: 1,
-        title: 1,
-        description: 1,
-        requiredSkills: 1,
-        city: 1,
-        employmentType: 1,
-        experienceLevel: 1,
-        category: 1,
-        budgetMin: 1,
-        budgetMax: 1,
-      })
-      .lean();
+    const unifiedDataset = await loadUnifiedDatasetFromJson();
+    const openProjects = unifiedDataset.filter((item) => item.status === 'OPEN');
 
     const payload = {
       skills: body.skills || toStringList(profile?.skills).join(', '),
