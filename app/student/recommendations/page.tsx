@@ -3,19 +3,14 @@
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import {
-  canRenderMatchPercent,
   extractRecommendations,
-  getScoreRange,
   JobRecommendation,
-  scoreToPercent,
   trimDescription,
 } from '@/lib/jobRecommendations';
 import { ProfileReadiness } from '@/lib/profileReadiness';
 
 export default function RecommendationsPage() {
   const [items, setItems] = useState<JobRecommendation[]>([]);
-  const [source, setSource] = useState('Loading...');
-  const [warning, setWarning] = useState('');
   const [error, setError] = useState('');
   const [sort, setSort] = useState<'match' | 'title'>('match');
   const [profileReadiness, setProfileReadiness] = useState<ProfileReadiness>({
@@ -29,23 +24,19 @@ export default function RecommendationsPage() {
     fetch('/api/recommend', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ top_n: 8 })
+      body: JSON.stringify({ top_n: 50 })
     })
       .then((r) => r.json())
       .then((payload) => {
         if (payload?.error) throw new Error(payload.error);
         setItems(extractRecommendations(payload));
-        setSource(payload?.source || payload?.data?.source || 'ML API');
         if (payload?.profileReadiness) {
           setProfileReadiness(payload.profileReadiness);
         }
-        const warnings = payload?.warnings || payload?.data?.warnings || [];
-        if (Array.isArray(warnings) && warnings.length) setWarning(String(warnings[0]));
       })
       .catch((err: any) => {
         console.error('RECOMMENDATIONS PAGE ERROR:', err);
         setError(err?.message || 'Could not load recommendations');
-        setSource('ML API');
       });
   }, []);
 
@@ -58,14 +49,10 @@ export default function RecommendationsPage() {
         )
       );
     } else {
-      arr.sort((a, b) => Number(b.final_score || 0) - Number(a.final_score || 0));
+      arr.sort((a, b) => Number(b.matchPercent || b.final_score || 0) - Number(a.matchPercent || a.final_score || 0));
     }
     return arr;
   }, [items, sort]);
-  const { minScore, maxScore } = useMemo(() => getScoreRange(rendered), [rendered]);
-  const showPercent =
-    profileReadiness.recommendationMode === 'ready' &&
-    canRenderMatchPercent(minScore, maxScore);
 
   const applyToProject = async (projectId?: string) => {
     if (!projectId) return;
@@ -109,20 +96,18 @@ export default function RecommendationsPage() {
         </select>
       </div>
 
-      <div className="card p-3 text-sm text-slate-600">Recommendation source: {source}</div>
       {profileReadiness.recommendationMode === 'preliminary' && (
         <div className="card p-3 text-sm text-blue-700">
-          Preliminary recommendations — finish your profile for higher-confidence ML matches.
+          These recommendations are available now, and your results can improve further with a stronger profile.
         </div>
       )}
-      {warning && <div className="card p-3 text-sm text-amber-700">{warning}</div>}
       {error && <div className="card p-3 text-sm text-red-600">{error}</div>}
 
       {!error && profileReadiness.recommendationMode === 'blocked' && (
         <div className="card p-6 text-center">
           <p className="text-xl font-semibold text-slate-900">Complete your profile to get personalized recommendations</p>
           <p className="mt-2 text-sm text-slate-600">
-            Missing fields: {profileReadiness.missingFields.join(', ') || 'skills, interests, city, experienceLevel'}
+            I can help you strengthen your profile with targeted improvements for better matches.
           </p>
           <Link
             href="/student/profile"
@@ -145,9 +130,9 @@ export default function RecommendationsPage() {
         <div key={i.project_id || `${i.title || 'project'}-${idx}`} className="card p-4">
           <div className="flex justify-between gap-3">
             <h3 className="font-semibold">{i.title || i.job_title || `Recommendation #${idx + 1}`}</h3>
-            {showPercent ? (
+            {Number.isFinite(Number(i.matchPercent)) ? (
               <span className="text-brand font-semibold">
-                {scoreToPercent(Number(i.final_score), minScore, maxScore)}% match
+                {Math.round(Number(i.matchPercent))}% match
               </span>
             ) : (
               <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-700">
@@ -160,13 +145,13 @@ export default function RecommendationsPage() {
             )}
           </div>
           <p className="mt-1 text-sm text-slate-600">
-            {trimDescription(i.text || 'No description provided.', 240)}
+            {trimDescription(i.description || i.text || 'No description provided.', 160)}
           </p>
           <div className="mt-2 grid gap-1 text-xs text-slate-500 md:grid-cols-4">
             <p>City: {i.city || 'Not specified'}</p>
             <p>Employment: {i.employment_type || 'Not specified'}</p>
             <p>Experience: {i.experience_level || 'Not specified'}</p>
-            <p>Salary: {i.salary || 'Not specified'}</p>
+            <p>Company: {i.company || 'Not specified'}</p>
           </div>
           <div className="mt-1 grid gap-1 text-xs text-slate-500 md:grid-cols-2">
             <p>Category: {i.category || 'Not specified'}</p>

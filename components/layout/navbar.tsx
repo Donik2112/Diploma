@@ -63,7 +63,6 @@ export function Navbar() {
       ['Dashboard', '/student/dashboard'],
       ['Applications', '/student/applications'],
       ['Messages', '/student/messages'],
-      ['Profile', '/student/profile']
     ] as const;
     if (authUser.role === 'CLIENT') return [
       ['Dashboard', '/client/dashboard'],
@@ -78,11 +77,18 @@ export function Navbar() {
     ] as const;
   }, [authUser]);
 
-  const publicLinks = [
+  const baseLinks = [
     ['Home', '/'],
     ['Projects', '/projects'],
-    ['About', '/about']
   ] as const;
+
+  const aboutLink = ['About', '/about'] as const;
+
+  const profileHref = authUser?.role === 'STUDENT'
+    ? '/student/profile'
+    : authUser?.role === 'CLIENT'
+      ? '/client/dashboard'
+      : '/admin/dashboard';
 
   return (
     <header className="sticky top-0 z-40 border-b border-slate-200 bg-white/95 backdrop-blur">
@@ -101,7 +107,7 @@ export function Navbar() {
         </div>
 
         <nav className="hidden lg:flex items-center gap-1">
-          {publicLinks.map(([label, href]) => (
+          {baseLinks.map(([label, href]) => (
             <Link key={href} href={href} className="rounded-lg px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-900">
               {label}
             </Link>
@@ -111,6 +117,9 @@ export function Navbar() {
               {label}
             </Link>
           ))}
+          <Link href={aboutLink[1]} className="rounded-lg px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-900">
+            {aboutLink[0]}
+          </Link>
         </nav>
 
         <div className="hidden lg:flex items-center gap-2">
@@ -122,8 +131,11 @@ export function Navbar() {
           )}
           {!loading && authUser && (
             <>
-              <Link href={authUser.role === 'STUDENT' ? '/student/dashboard' : authUser.role === 'CLIENT' ? '/client/dashboard' : '/admin/dashboard'} className="btn-secondary">
-                Account
+              <Link href="/favorites" className="btn-secondary" title="Saved vacancies">
+                ♥
+              </Link>
+              <Link href={profileHref} className="btn-secondary">
+                Profile
               </Link>
               <button type="button" onClick={logout} disabled={logoutBusy} className="btn-primary disabled:opacity-50">
                 {logoutBusy ? 'Signing out...' : 'Sign out'}
@@ -144,11 +156,17 @@ export function Navbar() {
       {mobileOpen && (
         <div className="border-t border-slate-200 bg-white lg:hidden">
           <div className="container-app grid gap-2 py-4">
-            {[...publicLinks, ...roleLinks].map(([label, href]) => (
+            {[...baseLinks, ...roleLinks, aboutLink].map(([label, href]) => (
               <Link key={href} href={href} onClick={() => setMobileOpen(false)} className="rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700">
                 {label}
               </Link>
             ))}
+            {!loading && authUser && (
+              <>
+                <Link href="/favorites" onClick={() => setMobileOpen(false)} className="btn-secondary">♥ Favorites</Link>
+                <Link href={profileHref} onClick={() => setMobileOpen(false)} className="btn-secondary">Profile</Link>
+              </>
+            )}
             {!loading && !authUser && (
               <>
                 <Link href="/signin" onClick={() => setMobileOpen(false)} className="btn-secondary">Sign in</Link>

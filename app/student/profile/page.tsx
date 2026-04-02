@@ -97,6 +97,12 @@ function toCsv(arr: string[] = []) {
   return arr.join(', ');
 }
 
+function normalizeUrlInput(value: string) {
+  const trimmed = value.trim();
+  if (!trimmed) return '';
+  return /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
+}
+
 function formatEnglishDate(value?: string) {
   if (!value) return 'Not specified';
   const date = new Date(value);
@@ -137,7 +143,9 @@ export default function StudentProfilePage() {
   const [editingCertificateIndex, setEditingCertificateIndex] = useState<number | null>(null);
   const [editingDiplomaIndex, setEditingDiplomaIndex] = useState<number | null>(null);
   const [editingExperienceIndex, setEditingExperienceIndex] = useState<number | null>(null);
+  const [editingPortfolioIndex, setEditingPortfolioIndex] = useState<number | null>(null);
   const [languageQuery, setLanguageQuery] = useState('');
+  const [portfolioLinkDraft, setPortfolioLinkDraft] = useState('');
 
   const [form, setForm] = useState<any>({
     firstName: '', lastName: '', birthDate: '', phone: '', email: '',
@@ -145,7 +153,7 @@ export default function StudentProfilePage() {
     headline: '', preferredRoles: '', about: '', bio: '', experience: '', projects: '', languages: '', achievements: '', volunteering: '',
     languageSelections: [] as string[],
     skills: [] as string[], interests: [] as string[],
-    githubUrl: '', linkedinUrl: '', portfolioLinks: '',
+    githubUrl: '', linkedinUrl: '', portfolioLinks: [] as string[],
     experienceLevel: 'JUNIOR', availabilityStatus: 'AVAILABLE',
     avatarDataUrl: '',
     certificateDocuments: [] as CertificateDoc[],
@@ -190,7 +198,7 @@ export default function StudentProfilePage() {
           interests: p.interests || [],
           githubUrl: p.githubUrl || '',
           linkedinUrl: p.linkedinUrl || '',
-          portfolioLinks: toCsv(p.portfolioLinks || []),
+          portfolioLinks: p.portfolioLinks || [],
           experienceLevel: p.experienceLevel || 'JUNIOR',
           availabilityStatus: p.availabilityStatus || 'AVAILABLE',
           avatarDataUrl: p.avatarDataUrl || p.avatar || '',
@@ -245,6 +253,12 @@ export default function StudentProfilePage() {
     setMessage('');
     setSaving(true);
     try {
+      const githubUrl = normalizeUrlInput(form.githubUrl || '');
+      const linkedinUrl = normalizeUrlInput(form.linkedinUrl || '');
+
+      if (githubUrl) new URL(githubUrl);
+      if (linkedinUrl) new URL(linkedinUrl);
+
       const payload = {
         firstName: form.firstName,
         lastName: form.lastName,
@@ -269,9 +283,9 @@ export default function StudentProfilePage() {
         diplomas: form.diplomaDocuments.map((x: DiplomaDoc) => `${x.university} ${x.degree || ''}`.trim()),
         certificateDocuments: form.certificateDocuments,
         diplomaDocuments: form.diplomaDocuments,
-        portfolioLinks: fromCsv(form.portfolioLinks),
-        githubUrl: form.githubUrl,
-        linkedinUrl: form.linkedinUrl,
+        portfolioLinks: form.portfolioLinks,
+        githubUrl,
+        linkedinUrl,
         avatarDataUrl: form.avatarDataUrl,
         avatar: form.avatarDataUrl,
         experienceLevel: form.experienceLevel,
@@ -331,8 +345,6 @@ export default function StudentProfilePage() {
           <section className="card p-6"><h2 className="mb-4 text-lg font-semibold">Education</h2><div className="grid gap-4 md:grid-cols-2">
             <LabeledField label="University"><input className="rounded-xl border px-3 py-2 text-sm" value={form.university} onChange={(e)=>setForm({...form, university:e.target.value})} placeholder="Search university" /><div className="mt-2 max-h-32 overflow-auto rounded-xl border p-2">{KAZAKHSTAN_UNIVERSITIES.filter((u)=>u.toLowerCase().includes(form.university.toLowerCase())).slice(0,8).map((u)=><button key={u} type="button" className="block w-full rounded px-2 py-1 text-left text-xs hover:bg-slate-50" onClick={()=>setForm({...form, university:u})}>{u}</button>)}</div></LabeledField>
             <LabeledField label="City"><input className="rounded-xl border px-3 py-2 text-sm" value={form.city} onChange={(e)=>setForm({...form, city:e.target.value})} placeholder="Search city" /><div className="mt-2 max-h-32 overflow-auto rounded-xl border p-2">{CITIES.filter((c)=>c.toLowerCase().includes(form.city.toLowerCase())).map((c)=><button key={c} type="button" className="block w-full rounded px-2 py-1 text-left text-xs hover:bg-slate-50" onClick={()=>setForm({...form, city:c})}>{c}</button>)}</div></LabeledField>
-            <LabeledField label="Degree"><select className="rounded-xl border px-3 py-2 text-sm" value={diplomaDraft.degree||''} onChange={(e)=>setDiplomaDraft({...diplomaDraft, degree:e.target.value})}><option value="">Select degree</option>{DEGREE_OPTIONS.map((d)=><option key={d} value={d}>{d}</option>)}</select></LabeledField>
-            <LabeledField label="Field of Study"><input className="rounded-xl border px-3 py-2 text-sm" value={diplomaDraft.fieldOfStudy||''} onChange={(e)=>setDiplomaDraft({...diplomaDraft, fieldOfStudy:e.target.value})} /></LabeledField>
           </div></section>
 
           <section className="card p-6"><h2 className="mb-4 text-lg font-semibold">Skills</h2><div className="grid gap-4 md:grid-cols-2">
@@ -390,6 +402,8 @@ export default function StudentProfilePage() {
             <LabeledField label="Professional Headline"><input className="rounded-xl border px-3 py-2 text-sm" value={form.headline} onChange={(e)=>setForm({...form, headline:e.target.value})} /></LabeledField>
             <LabeledField label="Preferred Roles"><input className="rounded-xl border px-3 py-2 text-sm" value={form.preferredRoles} onChange={(e)=>setForm({...form, preferredRoles:e.target.value})} /></LabeledField>
             <LabeledField label="About"><textarea className="min-h-28 rounded-xl border px-3 py-2 text-sm" value={form.about} onChange={(e)=>setForm({...form, about:e.target.value})} /></LabeledField>
+            <LabeledField label="GitHub URL"><input className="rounded-xl border px-3 py-2 text-sm" value={form.githubUrl} onChange={(e)=>setForm({...form, githubUrl:e.target.value})} placeholder="https://github.com/username" /></LabeledField>
+            <LabeledField label="LinkedIn URL"><input className="rounded-xl border px-3 py-2 text-sm" value={form.linkedinUrl} onChange={(e)=>setForm({...form, linkedinUrl:e.target.value})} placeholder="https://www.linkedin.com/in/username" /></LabeledField>
             <LabeledField label="Experience"><textarea className="min-h-28 rounded-xl border px-3 py-2 text-sm" value={form.experience} onChange={(e)=>setForm({...form, experience:e.target.value})} /></LabeledField>
             <LabeledField label="Projects"><textarea className="min-h-28 rounded-xl border px-3 py-2 text-sm" value={form.projects} onChange={(e)=>setForm({...form, projects:e.target.value})} /></LabeledField>
             <LabeledField label="Languages">
@@ -438,6 +452,46 @@ export default function StudentProfilePage() {
             <LabeledField label="Achievements"><textarea className="min-h-28 rounded-xl border px-3 py-2 text-sm" value={form.achievements} onChange={(e)=>setForm({...form, achievements:e.target.value})} /></LabeledField>
             <LabeledField label="Volunteering"><textarea className="min-h-28 rounded-xl border px-3 py-2 text-sm" value={form.volunteering} onChange={(e)=>setForm({...form, volunteering:e.target.value})} /></LabeledField>
           </div></section>
+          <section className="card p-6"><h2 className="mb-4 text-lg font-semibold">Portfolio Links</h2>
+            <div className="flex flex-wrap gap-2">
+              <input
+                className="min-w-[260px] flex-1 rounded-xl border px-3 py-2 text-sm"
+                value={portfolioLinkDraft}
+                onChange={(e)=>setPortfolioLinkDraft(e.target.value)}
+                placeholder="https://your-portfolio-link.com"
+              />
+              <button
+                type="button"
+                className="rounded-lg border px-3 py-2 text-sm"
+                onClick={() => {
+                  const next = normalizeUrlInput(portfolioLinkDraft);
+                  if (!next) return setError('Portfolio link is required.');
+                  try { new URL(next); } catch { return setError('Enter a valid portfolio URL.'); }
+                  const list = [...form.portfolioLinks];
+                  if (editingPortfolioIndex === null) {
+                    if (list.includes(next)) return setError('This portfolio link already exists.');
+                    list.push(next);
+                  } else {
+                    list[editingPortfolioIndex] = next;
+                  }
+                  setForm({ ...form, portfolioLinks: list });
+                  setPortfolioLinkDraft('');
+                  setEditingPortfolioIndex(null);
+                }}
+              >
+                {editingPortfolioIndex === null ? 'Add portfolio link' : 'Save portfolio link'}
+              </button>
+            </div>
+            <div className="mt-3 space-y-2">
+              {form.portfolioLinks.length ? form.portfolioLinks.map((link: string, index: number) => (
+                <div key={`${link}-${index}`} className="flex flex-wrap items-center gap-2 rounded-xl border p-3">
+                  <a href={link} target="_blank" rel="noreferrer" className="min-w-[220px] flex-1 text-sm text-blue-700 underline">{link}</a>
+                  <button type="button" className="rounded-md border px-2 py-1 text-xs" onClick={()=>{ setPortfolioLinkDraft(link); setEditingPortfolioIndex(index); }}>Edit</button>
+                  <button type="button" className="rounded-md border border-red-200 px-2 py-1 text-xs text-red-600" onClick={()=>setForm({ ...form, portfolioLinks: form.portfolioLinks.filter((_: string, idx: number)=>idx !== index) })}>Remove</button>
+                </div>
+              )) : <EmptyState text="No portfolio links yet." />}
+            </div>
+          </section>
 
           <div className="flex justify-end"><button disabled={saving} className="btn-primary disabled:opacity-60">{saving ? 'Saving profile...' : 'Save profile'}</button></div>
         </form>
@@ -453,7 +507,7 @@ export default function StudentProfilePage() {
           <section className="card p-6"><h2 className="text-lg font-semibold">Languages</h2><div className="mt-2 flex flex-wrap gap-2">{(form.languageSelections||[]).length ? form.languageSelections.map((x:string)=><span key={x} className="rounded-full bg-slate-100 px-2 py-1 text-xs">{x}</span>) : <EmptyState text="No languages yet." />}</div></section>
           <section className="card p-6"><h2 className="text-lg font-semibold">Achievements</h2><p className="mt-2 text-sm text-slate-600">{form.achievements || 'No achievements yet.'}</p></section>
           <section className="card p-6"><h2 className="text-lg font-semibold">Volunteering</h2><p className="mt-2 text-sm text-slate-600">{form.volunteering || 'No volunteering details yet.'}</p></section>
-          <section className="card p-6"><h2 className="text-lg font-semibold">Portfolio</h2>{fromCsv(form.portfolioLinks).length ? fromCsv(form.portfolioLinks).map((x:string)=><a key={x} href={x} target="_blank" rel="noreferrer" className="mt-2 block text-sm text-blue-700 underline">{x}</a>) : <EmptyState text="No portfolio links yet." />}</section>
+          <section className="card p-6"><h2 className="text-lg font-semibold">Portfolio</h2>{form.portfolioLinks.length ? form.portfolioLinks.map((x:string)=><a key={x} href={x} target="_blank" rel="noreferrer" className="mt-2 block text-sm text-blue-700 underline">{x}</a>) : <EmptyState text="No portfolio links yet." />}</section>
           <section className="card p-6"><h2 className="text-lg font-semibold">Career Preferences</h2><p className="mt-2 text-sm">{form.workplaceType} · {form.experienceLevel} · {form.availabilityStatus}</p></section>
         </div>
       )}

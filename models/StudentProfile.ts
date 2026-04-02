@@ -10,6 +10,7 @@ const StudentProfileSchema = new Schema({
   city: String,
   bio: String,
   headline: String,
+  experience: String,
   projects: String,
   experienceEntries: [{
     jobTitle: String,
