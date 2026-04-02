@@ -14,8 +14,6 @@ import { ProfileReadiness } from '@/lib/profileReadiness';
 
 export default function RecommendationsPage() {
   const [items, setItems] = useState<JobRecommendation[]>([]);
-  const [source, setSource] = useState('Loading...');
-  const [warning, setWarning] = useState('');
   const [error, setError] = useState('');
   const [sort, setSort] = useState<'match' | 'title'>('match');
   const [profileReadiness, setProfileReadiness] = useState<ProfileReadiness>({
@@ -35,17 +33,13 @@ export default function RecommendationsPage() {
       .then((payload) => {
         if (payload?.error) throw new Error(payload.error);
         setItems(extractRecommendations(payload));
-        setSource(payload?.source || payload?.data?.source || 'ML API');
         if (payload?.profileReadiness) {
           setProfileReadiness(payload.profileReadiness);
         }
-        const warnings = payload?.warnings || payload?.data?.warnings || [];
-        if (Array.isArray(warnings) && warnings.length) setWarning(String(warnings[0]));
       })
       .catch((err: any) => {
         console.error('RECOMMENDATIONS PAGE ERROR:', err);
         setError(err?.message || 'Could not load recommendations');
-        setSource('ML API');
       });
   }, []);
 
@@ -109,20 +103,18 @@ export default function RecommendationsPage() {
         </select>
       </div>
 
-      <div className="card p-3 text-sm text-slate-600">Recommendation source: {source}</div>
       {profileReadiness.recommendationMode === 'preliminary' && (
         <div className="card p-3 text-sm text-blue-700">
-          Preliminary recommendations — finish your profile for higher-confidence ML matches.
+          These recommendations are available now, and your results can improve further with a stronger profile.
         </div>
       )}
-      {warning && <div className="card p-3 text-sm text-amber-700">{warning}</div>}
       {error && <div className="card p-3 text-sm text-red-600">{error}</div>}
 
       {!error && profileReadiness.recommendationMode === 'blocked' && (
         <div className="card p-6 text-center">
           <p className="text-xl font-semibold text-slate-900">Complete your profile to get personalized recommendations</p>
           <p className="mt-2 text-sm text-slate-600">
-            Missing fields: {profileReadiness.missingFields.join(', ') || 'skills, interests, city, experienceLevel'}
+            I can help you strengthen your profile with targeted improvements for better matches.
           </p>
           <Link
             href="/student/profile"

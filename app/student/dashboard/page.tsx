@@ -16,8 +16,6 @@ export default function StudentDashboard() {
   const [applications, setApplications] = useState<any[]>([]);
   const [recommendations, setRecommendations] = useState<JobRecommendation[]>([]);
   const [profileCompletion, setProfileCompletion] = useState(0);
-  const [recommendSource, setRecommendSource] = useState('Loading...');
-  const [recommendWarning, setRecommendWarning] = useState('');
   const [profileReadiness, setProfileReadiness] = useState<ProfileReadiness>({
     completenessPercent: 0,
     missingFields: [],
@@ -47,9 +45,6 @@ export default function StudentDashboard() {
           setProfileReadiness(recData.profileReadiness);
         }
         setProfileCompletion(Number(profileData?.data?.completion || 0));
-        setRecommendSource(recData?.source || recData?.data?.source || 'ML API');
-        const warnings = recData?.warnings || recData?.data?.warnings || [];
-        setRecommendWarning(Array.isArray(warnings) && warnings.length ? String(warnings[0]) : '');
       } finally {
         setLoading(false);
       }
@@ -133,13 +128,11 @@ export default function StudentDashboard() {
             <h2 className="text-xl font-semibold text-slate-900">Recommended for you</h2>
             <Link href="/student/recommendations" className="text-sm font-semibold text-blue-700">See all</Link>
           </div>
-          <p className="mt-2 text-xs text-slate-500">Recommendation source: {recommendSource}</p>
           {profileReadiness.recommendationMode === 'preliminary' && (
             <p className="mt-1 text-xs text-blue-700">
-              Preliminary recommendations — complete your profile for higher-confidence ML matching.
+              Your recommendations are ready. Strengthening your profile can unlock even better matches.
             </p>
           )}
-          {recommendWarning && <p className="mt-1 text-xs text-amber-700">{recommendWarning}</p>}
           {loading ? (
             <div className="mt-4 space-y-3">
               {Array.from({ length: 3 }).map((_, idx) => <div key={idx} className="h-20 animate-pulse rounded-2xl bg-slate-100" />)}
@@ -150,9 +143,7 @@ export default function StudentDashboard() {
               <p className="mt-1 text-sm text-slate-700">
                 Add skills, interests, city and experience level to unlock personalized ML recommendations.
               </p>
-              <p className="mt-2 text-xs text-slate-600">
-                Missing fields: {profileReadiness.missingFields.join(', ') || 'skills, interests, city, experienceLevel'}
-              </p>
+              <p className="mt-2 text-xs text-slate-600">Use the AI assistant to get a personalized profile improvement plan.</p>
               <Link href="/student/profile" className="mt-4 inline-flex rounded-lg bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700">
                 Complete profile
               </Link>

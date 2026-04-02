@@ -7,14 +7,11 @@ export default function RecommendPage() {
   const [strictCity, setStrictCity] = useState(false);
   const [loading, setLoading] = useState(false);
   const [results, setResults] = useState<any[]>([]);
-  const [source, setSource] = useState('');
-  const [warning, setWarning] = useState('');
   const [error, setError] = useState('');
 
   const handleSubmit = async () => {
     setLoading(true);
     setError('');
-    setWarning('');
     setResults([]);
 
     try {
@@ -28,10 +25,6 @@ export default function RecommendPage() {
 
       const rows = data?.data?.recommendations || data?.recommendations || [];
       setResults(Array.isArray(rows) ? rows : []);
-      setSource(data?.source || data?.data?.source || 'ML API');
-
-      const warnings = data?.warnings || data?.data?.warnings || [];
-      if (Array.isArray(warnings) && warnings.length) setWarning(String(warnings[0]));
     } catch (err: any) {
       setError(err.message || 'Something went wrong');
     } finally {
@@ -58,8 +51,6 @@ export default function RecommendPage() {
         </button>
       </div>
 
-      {source && <p className="text-sm text-slate-500">Recommendation source: {source}</p>}
-      {warning && <p className="text-sm text-amber-700">{warning}</p>}
       {error && <p className="text-red-600">{error}</p>}
 
       {!loading && !error && results.length === 0 && (

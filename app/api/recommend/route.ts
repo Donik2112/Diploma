@@ -158,7 +158,7 @@ export async function POST(req: NextRequest) {
       success: true,
       source: 'ML API',
       warnings: missing.length
-        ? [`Profile is incomplete: missing ${missing.join(', ')}`]
+        ? ['Your profile can be strengthened for better recommendation quality.']
         : [],
       data: mlData,
       recommendations,
