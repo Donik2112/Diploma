@@ -288,13 +288,15 @@ function buildSuggestedAbout(profile: any) {
 }
 
 export async function runCareerAssistant(message: string, userId: string): Promise<AssistantReply> {
-  const profile = await StudentProfile.findOne({ userId }).lean();
+  const profileRaw = await StudentProfile.findOne({ userId }).lean();
+  const profileDoc = (Array.isArray(profileRaw) ? profileRaw[0] : profileRaw) as Record<string, unknown> | null;
+  const profile = profileDoc || {};
   const intent = parseIntent(message);
-  const recommendations = await fetchRecommendations(profile || {}, message);
-  const filtered = filterByIntent(recommendations, intent, message, String(profile?.city || '')).slice(0, 4);
+  const recommendations = await fetchRecommendations(profile, message);
+  const filtered = filterByIntent(recommendations, intent, message, String(profile.city || '')).slice(0, 4);
 
   const jobs = filtered.map((row: any) => {
-    const explanation = buildExplanation(profile || {}, row);
+    const explanation = buildExplanation(profile, row);
     return {
       projectId: String(row.project_id || row._id || ''),
       title: String(row.title || row.job_title || 'Recommended role'),
@@ -310,9 +312,9 @@ export async function runCareerAssistant(message: string, userId: string): Promi
     };
   });
 
-  const profileTips = buildProfileTips(profile || {});
+  const profileTips = buildProfileTips(profile);
   const suggestions = KNOWN_SKILLS.filter(
-    (skill) => !normalizeList(profile?.skills).map((s) => s.toLowerCase()).includes(skill.toLowerCase())
+    (skill) => !normalizeList(profile.skills).map((s) => s.toLowerCase()).includes(skill.toLowerCase())
   ).slice(0, 5);
 
   if (intent === 'improve_profile') {
@@ -322,7 +324,7 @@ export async function runCareerAssistant(message: string, userId: string): Promi
       quickActions: DEFAULT_QUICK_ACTIONS,
       profileTips,
       profilePatch: {
-        about: buildSuggestedAbout(profile || {}),
+        about: buildSuggestedAbout(profile),
         skills: suggestions,
       },
     };
