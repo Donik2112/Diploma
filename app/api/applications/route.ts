@@ -8,6 +8,13 @@ import { requireAuth } from '@/lib/auth';
 import { findProjectOrVacancyById } from '@/lib/projects/findProjectOrVacancyById';
 import mongoose from 'mongoose';
 
+const DEFAULT_COVER_LETTER = 'Hello, I am interested in this opportunity and would like to apply through UniWork.';
+
+function normalizeCoverLetter(value: unknown) {
+  const text = String(value || '').trim();
+  return text.length ? text : DEFAULT_COVER_LETTER;
+}
+
 const createSchema = z.object({
   projectId: z.string().min(2).optional(),
   itemId: z.string().min(2).optional(),
@@ -15,7 +22,7 @@ const createSchema = z.object({
   title: z.string().min(2).optional(),
   companyName: z.string().optional(),
   source: z.string().optional(),
-  coverLetter: z.string().min(20).max(2000),
+  coverLetter: z.string().max(2000).optional(),
   proposedPrice: z.coerce.number().min(0).nullable().optional(),
   expectedSalary: z.coerce.number().min(0).nullable().optional(),
   estimatedDuration: z.string().min(2).max(120).nullable().optional()
@@ -40,6 +47,7 @@ export async function POST(req: Request) {
     const user = requireAuth(['STUDENT']);
     await dbConnect();
     const payload = createSchema.parse(await req.json());
+    const coverLetter = normalizeCoverLetter(payload.coverLetter);
 
     const itemId = payload.itemId || payload.projectId;
     if (!itemId) {
@@ -67,7 +75,7 @@ export async function POST(req: Request) {
       city,
       category,
       source,
-      coverLetter: payload.coverLetter,
+      coverLetter,
       proposedPrice: payload.proposedPrice ?? null,
       expectedSalary: payload.expectedSalary ?? null,
       estimatedDuration: payload.estimatedDuration ?? null,
@@ -89,7 +97,7 @@ export async function POST(req: Request) {
       itemType: inferredType,
       senderId: user.userId,
       senderRole: 'STUDENT',
-      text: payload.coverLetter,
+      text: coverLetter,
     });
 
     const plain = app.toObject();

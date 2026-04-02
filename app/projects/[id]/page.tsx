@@ -9,6 +9,8 @@ type VacancySection = {
   conditions_items?: string[];
 };
 
+const DEFAULT_COVER_LETTER = 'Hello, I am interested in this opportunity and would like to apply through UniWork.';
+
 function toSkills(doc: any): string[] {
   if (Array.isArray(doc?.key_skills)) {
     return doc.key_skills
@@ -67,12 +69,9 @@ export default function ProjectDetails() {
 
   async function submitApplication() {
     if (!item) return;
-    if (!coverLetter.trim()) {
-      setMessage('Cover letter is required.');
-      return;
-    }
     const itemType = String(item?.entity_type || '').toLowerCase() === 'vacancy' ? 'vacancy' : 'project';
     const itemId = String(item?.id || id);
+    const normalizedCoverLetter = coverLetter.trim() || DEFAULT_COVER_LETTER;
     setSaving(true);
     try {
       const res = await fetch('/api/applications', {
@@ -84,7 +83,7 @@ export default function ProjectDetails() {
           title: item?.title,
           companyName: item?.company?.name || '',
           source: item?.source || '',
-          coverLetter,
+          coverLetter: normalizedCoverLetter,
           proposedPrice: proposedPrice ? Number(proposedPrice) : null,
           expectedSalary: expectedSalary ? Number(expectedSalary) : null,
           estimatedDuration: estimatedDuration || null,
@@ -227,9 +226,9 @@ export default function ProjectDetails() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
           <div className="w-full max-w-2xl rounded-2xl bg-white p-6 shadow-xl">
             <h3 className="text-xl font-semibold text-slate-900">Apply on UniWork</h3>
-            <p className="mt-1 text-sm text-slate-600">Send your cover letter and optional compensation expectations.</p>
+            <p className="mt-1 text-sm text-slate-600">Send your cover letter (optional) and compensation expectations if you want.</p>
             <div className="mt-4 space-y-3">
-              <textarea className="min-h-36 w-full rounded-xl border px-3 py-2 text-sm" value={coverLetter} onChange={(e)=>setCoverLetter(e.target.value)} placeholder="Cover letter / message to employer" />
+              <textarea className="min-h-36 w-full rounded-xl border px-3 py-2 text-sm" value={coverLetter} onChange={(e)=>setCoverLetter(e.target.value)} placeholder="Cover letter / message to employer (optional)" />
               <div className="grid gap-3 md:grid-cols-2">
                 <input className="rounded-xl border px-3 py-2 text-sm" value={proposedPrice} onChange={(e)=>setProposedPrice(e.target.value.replace(/[^0-9]/g,''))} placeholder="Proposed price (optional)" />
                 <input className="rounded-xl border px-3 py-2 text-sm" value={expectedSalary} onChange={(e)=>setExpectedSalary(e.target.value.replace(/[^0-9]/g,''))} placeholder="Expected salary (optional)" />
