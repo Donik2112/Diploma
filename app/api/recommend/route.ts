@@ -3,7 +3,7 @@ import { getUserFromCookie } from '@/lib/auth';
 import { dbConnect } from '@/lib/mongodb';
 import StudentProfile from '@/models/StudentProfile';
 import { getProfileReadiness } from '@/lib/profileReadiness';
-import { loadUnifiedDatasetFromJson } from '@/lib/recommendation/unified-dataset';
+import { loadUnifiedDataset } from '@/lib/recommendation/unified-dataset';
 
 export const dynamic = 'force-dynamic';
 
@@ -69,8 +69,20 @@ export async function POST(req: NextRequest) {
       profile = await StudentProfile.findOne({ userId: authUser.userId }).lean();
     }
 
-    const unifiedDataset = await loadUnifiedDatasetFromJson();
+    const unifiedDataset = await loadUnifiedDataset();
     const openProjects = unifiedDataset.filter((item) => item.status === 'OPEN');
+    console.log('[recommend] dataset summary', {
+      unifiedItems: unifiedDataset.length,
+      openItems: openProjects.length,
+    });
+
+    const profileSignals = {
+      skills: toStringList(profile?.skills).length,
+      interests: toStringList(profile?.interests).length,
+      city: Boolean(profile?.city),
+      experienceLevel: Boolean(profile?.experienceLevel),
+    };
+    console.log('[recommend] profile signals', profileSignals);
 
     const payload = {
       skills: body.skills || toStringList(profile?.skills).join(', '),

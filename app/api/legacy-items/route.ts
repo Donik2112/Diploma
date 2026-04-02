@@ -1,11 +1,11 @@
 import { NextResponse } from 'next/server';
-import { loadUnifiedDatasetFromJson } from '@/lib/recommendation/unified-dataset';
+import { loadUnifiedDataset } from '@/lib/recommendation/unified-dataset';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET() {
   try {
-    const items = await loadUnifiedDatasetFromJson();
+    const items = await loadUnifiedDataset();
 
     return NextResponse.json({
       success: true,

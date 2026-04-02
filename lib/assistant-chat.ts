@@ -1,6 +1,6 @@
 import StudentProfile from '@/models/StudentProfile';
 import { getProfileReadiness } from '@/lib/profileReadiness';
-import { loadUnifiedDatasetFromJson } from '@/lib/recommendation/unified-dataset';
+import { loadUnifiedDataset } from '@/lib/recommendation/unified-dataset';
 
 export type AssistantJobCard = {
   projectId: string;
@@ -172,7 +172,7 @@ function buildExplanation(profile: any, row: any) {
 }
 
 async function fetchRecommendations(profile: any, message: string) {
-  const openProjects = (await loadUnifiedDatasetFromJson()).filter((item) => item.status === 'OPEN');
+  const openProjects = (await loadUnifiedDataset()).filter((item) => item.status === 'OPEN');
 
   const cityFilter = parseCityFromMessage(message, String(profile?.city || ''));
   const mlPayload = {

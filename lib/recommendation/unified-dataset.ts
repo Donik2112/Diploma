@@ -1,5 +1,7 @@
 import { promises as fs } from 'fs';
 import path from 'path';
+import mongoose from 'mongoose';
+import { dbConnect } from '@/lib/mongodb';
 
 export type UnifiedItem = {
   id: string;
@@ -182,6 +184,16 @@ export function buildUnifiedDataset(input: {
   return merged;
 }
 
+function looksLikeVacancy(doc: Record<string, any>) {
+  if (String(doc?.entity_type || '').toLowerCase() === 'vacancy') return true;
+  return Boolean(doc?.description_text || doc?.employment_type || doc?.experience_level || doc?.location?.city);
+}
+
+function looksLikeProject(doc: Record<string, any>) {
+  if (String(doc?.entity_type || '').toLowerCase() === 'project') return true;
+  return Boolean(doc?.summary || doc?.required_skills || doc?.difficulty || doc?.related_vacancy_id);
+}
+
 async function readJsonArray(filePath: string): Promise<Record<string, any>[]> {
   try {
     const raw = await fs.readFile(filePath, 'utf8');
@@ -207,6 +219,76 @@ export async function loadUnifiedDatasetFromJson(): Promise<UnifiedItem[]> {
     if (vacancies.length || projects.length || vacancyCards.length) {
       return buildUnifiedDataset({ vacancies, projects, vacancyCards });
     }
+  }
+
+  return [];
+}
+
+async function readCollectionSafe(db: mongoose.mongo.Db, names: string[]): Promise<Record<string, any>[]> {
+  for (const name of names) {
+    const exists = await db.listCollections({ name }, { nameOnly: true }).hasNext();
+    if (!exists) continue;
+    const docs = await db.collection(name).find({}).toArray();
+    if (Array.isArray(docs)) return docs as Record<string, any>[];
+  }
+  return [];
+}
+
+export async function loadUnifiedDatasetFromMongo(): Promise<UnifiedItem[]> {
+  await dbConnect();
+  const db = mongoose.connection.db;
+  if (!db) return [];
+
+  const vacanciesDocs = await readCollectionSafe(db, ['vacancies']);
+  const projectsDocs = await readCollectionSafe(db, ['projects']);
+  const vacancyCardsDocs = await readCollectionSafe(db, ['vacancyCards', 'vacancy_cards']);
+
+  const normalizedVacancies = [
+    ...vacanciesDocs.map(mapVacancyToUnifiedItem),
+    ...projectsDocs.filter(looksLikeVacancy).map(mapVacancyToUnifiedItem),
+  ];
+  const normalizedProjects = projectsDocs.filter((doc) => looksLikeProject(doc) && !looksLikeVacancy(doc)).map(mapProjectToUnifiedItem);
+  const normalizedCards = vacancyCardsDocs.map(mapVacancyCardToUnifiedItem);
+
+  const seen = new Set<string>();
+  const unified: UnifiedItem[] = [];
+  for (const item of [...normalizedVacancies, ...normalizedProjects]) {
+    seen.add(item.id);
+    unified.push(item);
+  }
+  for (const item of normalizedCards) {
+    if (seen.has(item.id)) continue;
+    unified.push(item);
+  }
+
+  console.log('[unified-dataset] mongo counts', {
+    vacanciesCollection: vacanciesDocs.length,
+    projectsCollection: projectsDocs.length,
+    vacancyCardsCollection: vacancyCardsDocs.length,
+    normalizedVacancies: normalizedVacancies.length,
+    normalizedProjects: normalizedProjects.length,
+    normalizedCards: normalizedCards.length,
+    unifiedItems: unified.length,
+  });
+
+  return unified;
+}
+
+export async function loadUnifiedDataset(): Promise<UnifiedItem[]> {
+  const useLocalJsonOnly = process.env.USE_LOCAL_JSON_DATA === 'true';
+  const allowJsonFallback = process.env.ALLOW_JSON_FALLBACK === 'true';
+
+  if (useLocalJsonOnly) {
+    return loadUnifiedDatasetFromJson();
+  }
+
+  const mongoItems = await loadUnifiedDatasetFromMongo();
+  if (mongoItems.length > 0) return mongoItems;
+
+  if (allowJsonFallback) {
+    const jsonItems = await loadUnifiedDatasetFromJson();
+    console.log('[unified-dataset] using JSON fallback', { jsonItems: jsonItems.length });
+    return jsonItems;
   }
 
   return [];
