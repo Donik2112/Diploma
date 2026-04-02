@@ -4,6 +4,7 @@ import { dbConnect } from '@/lib/mongodb';
 import StudentProfile from '@/models/StudentProfile';
 import { getProfileReadiness } from '@/lib/profileReadiness';
 import { loadUnifiedDataset } from '@/lib/recommendation/unified-dataset';
+import { combineMatchPercent, ProfileSignals, summarizeDistribution } from '@/lib/recommendation/match-score';
 
 export const dynamic = 'force-dynamic';
 
@@ -46,18 +47,6 @@ function toProjectText(project: any) {
   };
 }
 
-function toCanonicalScore(value: unknown) {
-  const numeric = Number(value);
-  if (!Number.isFinite(numeric)) return 0;
-  return numeric;
-}
-
-function toCanonicalPercent(score: number) {
-  if (!Number.isFinite(score)) return 0;
-  if (score <= 1) return Math.max(0, Math.min(100, Math.round(score * 100)));
-  return Math.max(0, Math.min(100, Math.round(score)));
-}
-
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json().catch(() => ({}));
@@ -72,6 +61,14 @@ export async function POST(req: NextRequest) {
       profile = await StudentProfile.findOne({ userId: authUser.userId }).lean();
     }
 
+    const profileSignals: ProfileSignals = {
+      skills: toStringList(body.skills || profile?.skills),
+      interests: toStringList(body.interests || profile?.interests),
+      city: String(body.city || profile?.city || ''),
+      experience: String(body.experience || profile?.experienceLevel || 'JUNIOR'),
+      employment: String(body.employment || ''),
+    };
+
     const unifiedDataset = await loadUnifiedDataset();
     const openProjects = unifiedDataset.filter((item) => item.status === 'OPEN');
     const byId = new Map(openProjects.map((item) => [String(item.id), item]));
@@ -79,15 +76,9 @@ export async function POST(req: NextRequest) {
     console.log('[recommend] dataset summary', {
       unifiedItems: unifiedDataset.length,
       openItems: openProjects.length,
+      profileSkills: profileSignals.skills.length,
+      profileInterests: profileSignals.interests.length,
     });
-
-    const profileSignals = {
-      skills: toStringList(profile?.skills).length,
-      interests: toStringList(profile?.interests).length,
-      city: Boolean(profile?.city),
-      experienceLevel: Boolean(profile?.experienceLevel),
-    };
-    console.log('[recommend] profile signals', profileSignals);
 
     const requestedTopN = Number(body.top_n || 20);
     const profileReadiness = getProfileReadiness(profile);
@@ -97,9 +88,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({
         success: true,
         source: 'ML API',
-        warnings: [
-          'Complete your profile to get personalized recommendations.',
-        ],
+        warnings: ['Complete your profile to get personalized recommendations.'],
         profileReadiness,
         data: { recommendations: [] },
         recommendations: [],
@@ -118,12 +107,12 @@ export async function POST(req: NextRequest) {
     }
 
     const payload = {
-      skills: body.skills || toStringList(profile?.skills).join(', '),
-      interests: body.interests || toStringList(profile?.interests).join(', '),
-      experience: body.experience || profile?.experienceLevel || 'JUNIOR',
-      employment: body.employment || '',
-      city: body.city || profile?.city || '',
-      top_n: Math.max(requestedTopN, 50),
+      skills: profileSignals.skills.join(', '),
+      interests: profileSignals.interests.join(', '),
+      experience: profileSignals.experience,
+      employment: profileSignals.employment,
+      city: profileSignals.city,
+      top_n: Math.max(requestedTopN, 150),
       projects: openProjects.map(toProjectText),
     };
 
@@ -135,9 +124,7 @@ export async function POST(req: NextRequest) {
       try {
         const mlRes = await fetch(`${ML_API_URL}/recommend-projects`, {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload),
           cache: 'no-store',
           signal: controller.signal,
@@ -145,22 +132,16 @@ export async function POST(req: NextRequest) {
         const mlData = await mlRes.json().catch(() => null);
         if (!mlRes.ok) {
           console.error('ML service returned error:', mlData);
-          return NextResponse.json(
-            {
-              error: 'ML request failed',
-              details: mlData,
-            },
-            { status: mlRes.status }
-          );
+        } else {
+          recommendationsRaw = extractRecommendations(mlData);
         }
-        recommendationsRaw = extractRecommendations(mlData);
       } finally {
         clearTimeout(timeout);
       }
     }
 
     if (!recommendationsRaw.length) {
-      recommendationsRaw = openProjects.slice(0, 200).map((item, idx) => ({
+      recommendationsRaw = openProjects.slice(0, 300).map((item) => ({
         project_id: item.id,
         title: item.title,
         text: item.description,
@@ -170,8 +151,8 @@ export async function POST(req: NextRequest) {
         category: item.category,
         budget_min: item.budgetMin,
         budget_max: item.budgetMax,
-        final_score: Math.max(50, 95 - idx),
-        match_reason: 'Matched by shared skills and profile preferences.',
+        final_score: null,
+        match_reason: 'Matched by profile signals and skill overlap.',
       }));
     }
 
@@ -179,35 +160,50 @@ export async function POST(req: NextRequest) {
       .map((row) => {
         const id = String(row?.project_id || row?.id || '');
         const unified = byId.get(id);
-        const score = toCanonicalScore(row?.final_score ?? row?.score ?? row?.match_score);
-        const matchPercent = toCanonicalPercent(score);
+        if (!id || !unified) return null;
+
+        const combined = combineMatchPercent(profileSignals, unified, row?.final_score ?? row?.score ?? row?.match_score);
+
         return {
           project_id: id,
           id,
-          type: unified?.type || 'project',
-          title: row?.title || row?.job_title || unified?.title || 'Untitled item',
-          text: row?.text || unified?.description || '',
-          description: unified?.description || row?.text || '',
-          city: row?.city || unified?.city || '',
-          employment_type: row?.employment_type || unified?.employmentType || '',
-          experience_level: row?.experience_level || unified?.experienceLevel || '',
-          category: row?.category || unified?.category || '',
-          budget_min: Number.isFinite(Number(row?.budget_min)) ? Number(row?.budget_min) : unified?.budgetMin,
-          budget_max: Number.isFinite(Number(row?.budget_max)) ? Number(row?.budget_max) : unified?.budgetMax,
-          requiredSkills: unified?.requiredSkills || [],
-          source: unified?.source || 'ml',
-          final_score: score,
-          matchPercent,
-          matchScore: score,
-          match_reason: row?.match_reason || 'Match explanation is not available yet.',
+          type: unified.type,
+          title: row?.title || row?.job_title || unified.title,
+          description: unified.description,
+          text: row?.text || unified.description,
+          company: unified.company || 'Company not specified',
+          city: row?.city || unified.city,
+          category: row?.category || unified.category,
+          skills: unified.skills || unified.requiredSkills || [],
+          requiredSkills: unified.requiredSkills || [],
+          experienceLevel: unified.experienceLevel,
+          employmentType: unified.employmentType,
+          experience_level: row?.experience_level || unified.experienceLevel,
+          employment_type: row?.employment_type || unified.employmentType,
+          salaryMin: unified.budgetMin,
+          salaryMax: unified.budgetMax,
+          budget_min: Number.isFinite(Number(row?.budget_min)) ? Number(row?.budget_min) : unified.budgetMin,
+          budget_max: Number.isFinite(Number(row?.budget_max)) ? Number(row?.budget_max) : unified.budgetMax,
+          source: unified.source,
+          final_score: combined.matchScore,
+          matchScore: combined.matchScore,
+          matchPercent: combined.matchPercent,
+          match_reason: row?.match_reason || 'Matched by profile signals and skill overlap.',
           predicted_family: row?.predicted_family || null,
         };
       })
-      .filter((row) => row.project_id && byId.has(row.project_id))
-      .sort((a, b) => Number(b.matchPercent || 0) - Number(a.matchPercent || 0));
+      .filter(Boolean) as any[];
+
+    normalized.sort((a, b) => Number(b.matchPercent || 0) - Number(a.matchPercent || 0));
 
     const finalRows = normalized.slice(0, requestedTopN);
 
+    console.log('[recommend] ml vector sample', {
+      payloadSkills: payload.skills,
+      payloadInterests: payload.interests,
+      sampleProject: payload.projects[0] || null,
+    });
+    console.log('[recommend] score distribution', summarizeDistribution(finalRows));
     console.log('[recommend] returned summary', {
       rawRecommendations: recommendationsRaw.length,
       normalizedRecommendations: normalized.length,
@@ -217,7 +213,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      source: 'ML API',
+      source: ML_API_URL ? 'ML API' : 'heuristic',
       warnings: missing.length
         ? ['Your profile can be strengthened for better recommendation quality.']
         : [],
@@ -229,18 +225,9 @@ export async function POST(req: NextRequest) {
     console.error('Recommend route error:', error);
 
     if (error?.name === 'AbortError') {
-      return NextResponse.json(
-        { error: 'ML request timed out' },
-        { status: 504 }
-      );
+      return NextResponse.json({ error: 'ML request timed out' }, { status: 504 });
     }
 
-    return NextResponse.json(
-      {
-        error: 'ML request failed',
-        details: String(error),
-      },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: 'ML request failed', details: String(error) }, { status: 500 });
   }
 }

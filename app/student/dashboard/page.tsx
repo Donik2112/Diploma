@@ -146,10 +146,10 @@ export default function StudentDashboard() {
                     <div>
                       <p className="font-semibold text-slate-900">{rec.title || rec.job_title || `Recommendation #${idx + 1}`}</p>
                       <p className="mt-1 text-sm text-slate-600">
-                        {trimDescription(rec.match_reason || 'Match explanation is not available yet.', 120)}
+                        {trimDescription(rec.description || rec.match_reason || 'Match explanation is not available yet.', 120)}
                       </p>
                       <p className="mt-1 text-xs text-slate-500">
-                        {rec.city || 'Remote/Not specified'} · {rec.employment_type || 'Employment n/a'} · {rec.experience_level || 'Experience n/a'}
+                        {rec.company || 'Company not specified'} · {rec.city || 'Remote/Not specified'} · {rec.experience_level || 'Experience n/a'}
                       </p>
                       <div className="mt-2 flex flex-wrap items-center gap-2">
                         {rec.project_id ? (

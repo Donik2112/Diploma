@@ -7,10 +7,12 @@ export type UnifiedItem = {
   id: string;
   type: 'vacancy' | 'project';
   clientId: string | null;
+  company: string;
   title: string;
   description: string;
   category: string;
   requiredSkills: string[];
+  skills: string[];
   budgetMin: number | null;
   budgetMax: number | null;
   deadline: string | null;
@@ -86,10 +88,12 @@ export function mapVacancyToUnifiedItem(vacancy: Record<string, any>): UnifiedIt
     id: String(vacancy?.id || ''),
     type: 'vacancy',
     clientId: vacancy?.company?.id ? String(vacancy.company.id) : null,
+    company: String(vacancy?.company?.name || vacancy?.employer?.name || 'Company not specified'),
     title,
     description,
     category: inferCategoryFromText(title, description, requiredSkills),
     requiredSkills,
+    skills: requiredSkills,
     budgetMin: Number.isFinite(Number(vacancy?.salary?.from)) ? Number(vacancy.salary.from) : null,
     budgetMax: Number.isFinite(Number(vacancy?.salary?.to)) ? Number(vacancy.salary.to) : null,
     deadline: null,
@@ -117,10 +121,12 @@ export function mapProjectToUnifiedItem(project: Record<string, any>): UnifiedIt
     id: String(project?.id || ''),
     type: 'project',
     clientId: project?.related_vacancy_id ? String(project.related_vacancy_id) : null,
+    company: String(project?.company?.name || project?.clientName || 'Project owner'),
     title,
     description,
     category: String(project?.category || inferCategoryFromText(title, description, requiredSkills)),
     requiredSkills,
+    skills: requiredSkills,
     budgetMin: null,
     budgetMax: null,
     deadline: null,
@@ -144,10 +150,12 @@ export function mapVacancyCardToUnifiedItem(card: Record<string, any>): UnifiedI
     id: String(card?.id || fallbackId),
     type: 'vacancy',
     clientId: card?.company?.id ? String(card.company.id) : null,
+    company: String(card?.company?.name || card?.employer?.name || 'Company not specified'),
     title,
     description,
     category: inferCategoryFromText(title, description, requiredSkills),
     requiredSkills,
+    skills: requiredSkills,
     budgetMin: Number.isFinite(Number(card?.salary?.from)) ? Number(card.salary.from) : null,
     budgetMax: Number.isFinite(Number(card?.salary?.to)) ? Number(card.salary.to) : null,
     deadline: null,
@@ -186,6 +194,28 @@ export function buildUnifiedDataset(input: {
   return merged;
 }
 
+function dedupeKeyByContent(item: UnifiedItem) {
+  return `${String(item.title || '').trim().toLowerCase()}|${String(item.company || '').trim().toLowerCase()}|${String(item.city || '').trim().toLowerCase()}`;
+}
+
+function dedupeUnifiedItems(items: UnifiedItem[]): UnifiedItem[] {
+  const byId = new Set<string>();
+  const byContent = new Set<string>();
+  const deduped: UnifiedItem[] = [];
+
+  for (const item of items) {
+    const idKey = String(item.id || '').trim().toLowerCase();
+    const contentKey = dedupeKeyByContent(item);
+    if (idKey && byId.has(idKey)) continue;
+    if (byContent.has(contentKey)) continue;
+    if (idKey) byId.add(idKey);
+    byContent.add(contentKey);
+    deduped.push(item);
+  }
+
+  return deduped;
+}
+
 function looksLikeVacancy(doc: Record<string, any>) {
   if (String(doc?.entity_type || '').toLowerCase() === 'vacancy') return true;
   return Boolean(doc?.description_text || doc?.employment_type || doc?.experience_level || doc?.location?.city);
@@ -219,7 +249,10 @@ export async function loadUnifiedDatasetFromJson(): Promise<UnifiedItem[]> {
     const vacancyCards = await readJsonArray(path.join(dir, 'vacancy_cards.json'));
 
     if (vacancies.length || projects.length || vacancyCards.length) {
-      return buildUnifiedDataset({ vacancies, projects, vacancyCards });
+      const merged = buildUnifiedDataset({ vacancies, projects, vacancyCards });
+      const deduped = dedupeUnifiedItems(merged);
+      console.log('[unified-dataset] json dedup summary', { merged: merged.length, deduped: deduped.length });
+      return deduped;
     }
   }
 
@@ -263,6 +296,8 @@ export async function loadUnifiedDatasetFromMongo(): Promise<UnifiedItem[]> {
     unified.push(item);
   }
 
+  const dedupedUnified = dedupeUnifiedItems(unified);
+
   console.log('[unified-dataset] mongo counts', {
     vacanciesCollection: vacanciesDocs.length,
     projectsCollection: projectsDocs.length,
@@ -271,9 +306,10 @@ export async function loadUnifiedDatasetFromMongo(): Promise<UnifiedItem[]> {
     normalizedProjects: normalizedProjects.length,
     normalizedCards: normalizedCards.length,
     unifiedItems: unified.length,
+    dedupedUnifiedItems: dedupedUnified.length,
   });
 
-  return unified;
+  return dedupedUnified;
 }
 
 export async function loadUnifiedDataset(): Promise<UnifiedItem[]> {

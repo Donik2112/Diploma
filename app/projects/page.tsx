@@ -8,6 +8,7 @@ type UnifiedProject = {
   type: 'vacancy' | 'project';
   title: string;
   description: string;
+  company?: string;
   category: string;
   city?: string;
   budgetMin: number | null;
@@ -17,6 +18,7 @@ type UnifiedProject = {
   experienceLevel?: string;
   employmentType?: string;
   source?: string;
+  matchPercent?: number;
 };
 
 export default function ProjectsPage() {
@@ -36,9 +38,27 @@ export default function ProjectsPage() {
     setLoading(true);
     try {
       const qs = new URLSearchParams(form as any).toString();
-      const res = await fetch(`/api/projects?${qs}`);
-      const payload = await res.json();
-      setRows(payload.data || []);
+      const [projectsRes, recommendRes] = await Promise.all([
+        fetch(`/api/projects?${qs}`),
+        fetch('/api/recommend', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ top_n: 200 }),
+        }),
+      ]);
+      const payload = await projectsRes.json();
+      const recommendPayload = await recommendRes.json();
+      const recommendations = Array.isArray(recommendPayload?.recommendations)
+        ? recommendPayload.recommendations
+        : Array.isArray(recommendPayload?.data?.recommendations)
+          ? recommendPayload.data.recommendations
+          : [];
+      const matchById = new Map(recommendations.map((x: any) => [String(x.project_id || x.id), Number(x.matchPercent || 0)]));
+      const rowsWithScore = (payload.data || []).map((item: any) => ({
+        ...item,
+        matchPercent: matchById.get(String(item.id)) ?? null,
+      }));
+      setRows(rowsWithScore);
     } finally {
       setLoading(false);
     }
@@ -142,10 +162,10 @@ export default function ProjectsPage() {
                     <Link href={`/projects/${encodeURIComponent(p.id)}`} className="text-xl font-semibold text-slate-900 hover:text-blue-700">
                       {p.title}
                     </Link>
-                    <p className="mt-2 text-sm leading-relaxed text-slate-600">{p.description}</p>
+                    <p className="mt-2 text-sm leading-relaxed text-slate-600 line-clamp-2">{p.description}</p>
                   </div>
                   <div className="rounded-2xl border border-blue-200 bg-blue-50 px-3 py-2 text-sm font-semibold text-blue-700">
-                    {p.type}
+                    {Number.isFinite(Number(p.matchPercent)) ? `${Math.round(Number(p.matchPercent))}% match` : p.type}
                   </div>
                 </div>
 
@@ -159,20 +179,21 @@ export default function ProjectsPage() {
 
                 <div className="mt-5 grid gap-3 text-sm text-slate-600 md:grid-cols-4">
                   <div><p className="text-xs text-slate-500">Budget</p><p className="font-semibold text-slate-900">{Number.isFinite(Number(p.budgetMin)) || Number.isFinite(Number(p.budgetMax)) ? `$${p.budgetMin ?? 0} - $${p.budgetMax ?? 0}` : 'Not specified'}</p></div>
-                  <div><p className="text-xs text-slate-500">Category</p><p className="font-semibold text-slate-900">{p.category || 'General'}</p></div>
+                  <div><p className="text-xs text-slate-500">Company</p><p className="font-semibold text-slate-900">{p.company || 'Company not specified'}</p></div>
                   <div><p className="text-xs text-slate-500">City</p><p className="font-semibold text-slate-900">{p.city || 'Remote / Flexible'}</p></div>
-                  <div><p className="text-xs text-slate-500">Deadline</p><p className="font-semibold text-slate-900">{p.deadline ? new Date(p.deadline).toLocaleDateString() : 'Negotiable'}</p></div>
+                  <div><p className="text-xs text-slate-500">Experience</p><p className="font-semibold text-slate-900">{p.experienceLevel || 'Not specified'}</p></div>
                 </div>
 
                 <div className="mt-5 flex flex-wrap items-center justify-between gap-3">
                   <div className="flex items-center gap-2 text-xs text-slate-500">
-                    <span className="status-pill bg-emerald-100 text-emerald-700">OPEN</span>
+                    <span className="status-pill bg-emerald-100 text-emerald-700">{p.employmentType || 'OPEN'}</span>
                     <span className="status-pill bg-blue-100 text-blue-700">{p.source || 'unified'}</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <button onClick={() => setSaved((prev) => ({ ...prev, [p.id]: !prev[p.id] }))} className="btn-secondary">
                       {saved[p.id] ? 'Saved' : 'Save'}
                     </button>
+                    <button type="button" className="btn-secondary">Apply</button>
                     <Link href={`/projects/${encodeURIComponent(p.id)}`} className="btn-primary">View details</Link>
                   </div>
                 </div>

@@ -145,13 +145,13 @@ export default function RecommendationsPage() {
             )}
           </div>
           <p className="mt-1 text-sm text-slate-600">
-            {trimDescription(i.text || 'No description provided.', 240)}
+            {trimDescription(i.description || i.text || 'No description provided.', 160)}
           </p>
           <div className="mt-2 grid gap-1 text-xs text-slate-500 md:grid-cols-4">
             <p>City: {i.city || 'Not specified'}</p>
             <p>Employment: {i.employment_type || 'Not specified'}</p>
             <p>Experience: {i.experience_level || 'Not specified'}</p>
-            <p>Salary: {i.salary || 'Not specified'}</p>
+            <p>Company: {i.company || 'Not specified'}</p>
           </div>
           <div className="mt-1 grid gap-1 text-xs text-slate-500 md:grid-cols-2">
             <p>Category: {i.category || 'Not specified'}</p>

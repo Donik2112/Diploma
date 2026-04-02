@@ -38,6 +38,9 @@ export async function GET(req: Request) {
     console.log('[projects] dataset summary', {
       unifiedItems: unified.length,
       openItems: openItems.length,
+      sampleOpenItem: openItems[0]
+        ? { id: openItems[0].id, title: openItems[0].title, company: openItems[0].company, city: openItems[0].city, skills: (openItems[0].requiredSkills || []).slice(0, 6) }
+        : null,
     });
 
     let filtered = openItems.filter((item) => {
