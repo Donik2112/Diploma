@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 import Conversation from '@/models/Conversation';
 import { dbConnect } from '@/lib/mongodb';
 import { handleApi, ok } from '@/lib/api';
