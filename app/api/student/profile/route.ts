@@ -17,7 +17,9 @@ const optionalUrl = z.preprocess(
   (value) => {
     if (typeof value !== 'string') return value;
     const trimmed = value.trim();
-    return trimmed === '' ? undefined : trimmed;
+    if (trimmed === '') return undefined;
+    if (/^https?:\/\//i.test(trimmed)) return trimmed;
+    return `https://${trimmed}`;
   },
   z.string().url('Please enter a valid URL').optional()
 );
@@ -42,6 +44,7 @@ const schema = z.object({
   bio: optionalString(500),
   about: optionalString(2000),
   headline: optionalString(120),
+  experience: optionalString(4000),
   projects: optionalString(4000),
   experienceEntries: z.array(z.object({
     jobTitle: z.string().max(120),
@@ -125,6 +128,7 @@ export async function GET() {
       bio: profile?.bio || userDoc?.bio || '',
       about: profile?.about || '',
       headline: profile?.headline || '',
+      experience: profile?.experience || '',
       projects: profile?.projects || '',
       experienceEntries: profile?.experienceEntries || [],
       languages: profile?.languages || '',
@@ -183,6 +187,7 @@ export async function PUT(req: Request) {
             workplaceType: payload.workplaceType || 'REMOTE',
             about: payload.about || '',
             headline: payload.headline || '',
+            experience: payload.experience || '',
             projects: payload.projects || '',
             experienceEntries: payload.experienceEntries || [],
             languages: payload.languages || '',
